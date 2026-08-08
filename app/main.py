@@ -72,6 +72,18 @@ app = FastAPI(
     redoc_url="/api/redoc"
 )
 
+# ──────────────────────────────────────────────
+# CORS - Permitir cookies cross-origin (vital para móvil en producción)
+# ──────────────────────────────────────────────
+from fastapi.middleware.cors import CORSMiddleware
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["https://*.onrender.com", "http://localhost:8000", "http://127.0.0.1:8000"],
+    allow_credentials=True,          # ← CLAVE: permite cookies en peticiones cross-origin
+    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"],
+    allow_headers=["*"],
+)
+
 # Configurar templates y archivos estáticos
 templates = Jinja2Templates(directory=os.path.join(PROJECT_DIR, "templates"))
 app.mount("/static", StaticFiles(directory=os.path.join(PROJECT_DIR, "static")), name="static")

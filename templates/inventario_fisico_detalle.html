@@ -162,10 +162,11 @@
             input.addEventListener('change', function() {
                 const formData = new FormData(form);
                 fetch(form.action, {
-                    method: 'POST',
-                    body: formData,
-                    headers: { 'X-Requested-With': 'XMLHttpRequest' }
-                })
+                                    method: 'POST',
+                                    body: formData,
+                                    credentials: 'include',
+                                    headers: { 'X-Requested-With': 'XMLHttpRequest' }
+                                })
                 .then(response => response.json())
                 .then(data => {
                     if (data.success) {
