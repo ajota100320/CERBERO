@@ -76,7 +76,7 @@ app = FastAPI(
 # CORS - Permitir cookies cross-origin (vital para móvil en producción)
 # ──────────────────────────────────────────────
 from fastapi.middleware.cors import CORSMiddleware
-from starlette.middleware.proxy_headers import ProxyHeadersMiddleware
+from uvicorn.middleware.proxy_headers import ProxyHeadersMiddleware
 
 app.add_middleware(
     CORSMiddleware,
@@ -189,6 +189,32 @@ async def get_current_user(request: Request, db: Session = Depends(get_db)) -> O
             request.state.empresa = empresa
     return user
 
+# ──────────────────────────────────────────────
+# DEPENDENCIAS DE SEGURIDAD JERÁRQUICA (RBAC)
+# ──────────────────────────────────────────────
+async def get_admin_user(current_user: Usuario = Depends(require_roles(RolUsuario.ADMINISTRADOR, RolUsuario.SUPER_ADMIN))) -> Usuario:
+    """Requiere rol ADMINISTRADOR o SUPER_ADMIN."""
+    return current_user
+async def get_encargado_user(current_user: Usuario = Depends(require_roles(RolUsuario.ENCARGADO, RolUsuario.ADMINISTRADOR, RolUsuario.SUPER_ADMIN))) -> Usuario:
+    """Requiere rol ENCARGADO, ADMINISTRADOR o SUPER_ADMIN."""
+    return current_user
+async def get_super_admin_user(current_user: Usuario = Depends(require_roles(RolUsuario.SUPER_ADMIN))) -> Usuario:
+    """Requiere rol SUPER_ADMIN."""
+    return current_user
+
+# ──────────────────────────────────────────────
+# DEPENDENCIA GENÉRICA DE ROLES
+# ──────────────────────────────────────────────
+def require_roles(*allowed_roles):
+    """Devuelve una dependency que requiere que el usuario tenga uno de los roles permitidos."""
+    def role_checker(current_user: Usuario = Depends(get_current_user)):
+        if current_user is None:
+            raise HTTPException(status_code=401, detail="Not authenticated")
+        if current_user.rol not in allowed_roles:
+            raise HTTPException(status_code=403, detail="Insufficient permissions")
+        return current_user
+    return role_checker
+
 async def require_auth(request: Request, db: Session = Depends(get_db)) -> Usuario:
     """Dependency que requiere usuario autenticado.
     Para rutas web lanza HTTPException 303 con Location /login (FastAPI lo convierte en redirección).
@@ -223,12 +249,13 @@ async def require_auth(request: Request, db: Session = Depends(get_db)) -> Usuar
             )
     return user
 
-async def require_admin(user: Usuario = Depends(require_auth)) -> Usuario:
-    """Dependency que requiere rol ADMINISTRADOR"""
-    if user.rol != RolUsuario.ADMINISTRADOR:
-        raise HTTPException(status_code=403, detail="Acceso denegado: se requiere rol Administrador")
+async def require_admin(user: Usuario = Depends(get_current_user)) -> Usuario:
+    """Dependency que requiere rol ADMINISTRADOR o SUPER_ADMIN."""
+    if user is None:
+        raise HTTPException(status_code=401, detail="Not authenticated")
+    if user.rol not in (RolUsuario.ADMINISTRADOR, RolUsuario.SUPER_ADMIN):
+        raise HTTPException(status_code=403, detail="Acceso denegado: se requiere rol Administrador o Super Admin")
     return user
-
 async def require_encargado_or_admin(user: Usuario = Depends(require_auth)) -> Usuario:
     """Dependency que requiere ENCARGADO o ADMINISTRADOR"""
     if user.rol not in [RolUsuario.ENCARGADO, RolUsuario.ADMINISTRADOR]:
@@ -608,7 +635,7 @@ async def cambiar_password_post(
 async def saas_master_panel(
     request: Request,
     db: Session = Depends(get_db),
-    user: Usuario = Depends(require_super_admin)
+    user: Usuario = Depends(get_super_admin_user)
 ):
     """Panel exclusivo del dueño del SaaS. BLINDADO:
     - require_super_admin fuerza reset_tenant() → ve TODAS las empresas.
@@ -1282,7 +1309,7 @@ async def api_temp_alertas(db: Session = Depends(get_db)):
 # ──────────────────────────────────────────────
 
 @app.get("/requerimientos", response_class=HTMLResponse)
-async def list_requerimientos(request: Request, db: Session = Depends(get_db), user: Usuario = Depends(require_encargado_or_admin)):
+async def list_requerimientos(request: Request, db: Session = Depends(get_db), user: Usuario = Depends(get_encargado_user)):
     """
     Lista todos los requerimientos y calcula el total proyectado.
     Solo accesible para ENCARGADO y ADMINISTRADOR.
@@ -2669,7 +2696,7 @@ async def list_usuarios(
 async def create_usuario(
     request: Request,
     db: Session = Depends(get_db),
-    user: Usuario = Depends(require_admin),
+    user: Usuario = Depends(get_admin_user),
     nombre_completo: str = Form(...),
     email: str = Form(...),
     password: str = Form(...),
@@ -2895,7 +2922,7 @@ if __name__ == "__main__":
 async def branding_form(
     request: Request,
     db: Session = Depends(get_db),
-    user: Usuario = Depends(require_admin),
+    user: Usuario = Depends(get_admin_user),
 ):
     """Formulario de branding: colores, logo, tema. Solo ADMIN del tenant."""
     empresa = db.query(Empresa).filter(Empresa.id == user.empresa_id).first()
