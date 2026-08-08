@@ -76,6 +76,8 @@ app = FastAPI(
 # CORS - Permitir cookies cross-origin (vital para móvil en producción)
 # ──────────────────────────────────────────────
 from fastapi.middleware.cors import CORSMiddleware
+from starlette.middleware.proxy_headers import ProxyHeadersMiddleware
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["https://*.onrender.com", "http://localhost:8000", "http://127.0.0.1:8000"],
@@ -83,6 +85,11 @@ app.add_middleware(
     allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"],
     allow_headers=["*"],
 )
+
+# ──────────────────────────────────────────────
+# PROXY HEADERS - Trust X-Forwarded-* headers (for reverse proxies like Render)
+# ──────────────────────────────────────────────
+app.add_middleware(ProxyHeadersMiddleware, trusted_hosts=["*"])
 
 # Configurar templates y archivos estáticos
 templates = Jinja2Templates(directory=os.path.join(PROJECT_DIR, "templates"))
@@ -482,16 +489,13 @@ async def login_post(
     
     # Redirigir a dashboard con cookie httponly (solo el JWT, sin prefijo Bearer para evitar problemas de encoding de cookie)
     response = RedirectResponse(url="/", status_code=status.HTTP_303_SEE_OTHER)
-    # Configuración de cookie compatible con móvil (iOS/Safari, Android/Chrome)
-    # En producción (HTTPS): secure=True, samesite="none" para cross-site mobile
-    # En desarrollo (HTTP): secure=False, samesite="lax"
-    is_production = os.getenv("ENVIRONMENT", "development").lower() == "production"
+    # Configuración de cookie segura para móvil y web
     response.set_cookie(
         key="access_token",
         value=token,
         httponly=True,
-        secure=is_production,           # True solo en HTTPS (producción)
-        samesite="none" if is_production else "lax",  # "none" requiere secure=True
+        secure=True,
+        samesite="lax",
         max_age=expire_minutes * 60,
         path="/",                       # Disponible en toda la app
     )
@@ -504,8 +508,8 @@ async def logout(request: Request):
     response.delete_cookie(
         key="access_token",
         path="/",
-        secure=is_production,
-        samesite="none" if is_production else "lax",
+        secure=True,
+        samesite="lax",
     )
     return response
 
@@ -586,8 +590,8 @@ async def cambiar_password_post(
         key="access_token",
         value=token,
         httponly=True,
-        secure=is_production,           # True solo en HTTPS (producción)
-        samesite="none" if is_production else "lax",  # "none" requiere secure=True
+        secure=True,
+        samesite="lax",
         max_age=ACCESS_TOKEN_EXPIRE_MINUTES * 60,
         path="/",                       # Disponible en toda la app
     )
