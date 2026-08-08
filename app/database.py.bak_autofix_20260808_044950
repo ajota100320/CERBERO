@@ -1,0 +1,995 @@
+"""Módulo de Base de Datos - ERP Gastronómico
+Arquitectura SQLite con SQLAlchemy ORM
+Traducción fiel de la lógica AppSheet a esquema relacional
+FASE 2: Usuarios, Roles, Sucursales y Notificaciones
+"""
+
+from datetime import datetime, date, time
+from typing import Optional, List
+from sqlalchemy import (
+    create_engine, Column, Integer, String, Float, DateTime, Date, Time,
+    ForeignKey, Text, Boolean, Enum as SQLEnum, func, UniqueConstraint
+)
+from sqlalchemy.orm import declarative_base, relationship, sessionmaker, Session
+from sqlalchemy.pool import StaticPool
+import enum
+import os
+from dotenv import load_dotenv
+
+# ──────────────────────────────────────────────
+# CONFIGURACIÓN DE CONEXIÓN (multi-motor vía .env)
+# ──────────────────────────────────────────────
+# ENVIRONMENT: development (SQLite) | production (PostgreSQL/Supabase)
+load_dotenv()  # Carga .env desde la raíz del proyecto
+
+ENVIRONMENT = os.getenv("ENVIRONMENT", "development").strip().lower()
+DATABASE_URL_SQLITE = os.getenv("DATABASE_URL_SQLITE", "sqlite:///./v2.db")
+DATABASE_URL_POSTGRES = os.getenv("DATABASE_URL_POSTGRES", "")
+
+
+def _resolve_database_url() -> str:
+    """Elige el motor según ENVIRONMENT.
+    - production → PostgreSQL (debe estar configurado en .env)
+    - cualquier otro valor → SQLite (fallback seguro, nunca rompe dev)
+    """
+    if ENVIRONMENT == "production":
+        if not DATABASE_URL_POSTGRES or "tu_url_de_supabase" in DATABASE_URL_POSTGRES:
+            raise RuntimeError(
+                "ENVIRONMENT=production pero DATABASE_URL_POSTGRES no está configurada en .env"
+            )
+        return DATABASE_URL_POSTGRES
+    return DATABASE_URL_SQLITE
+
+
+DATABASE_URL = _resolve_database_url()
+
+# Parámetros específicos por motor
+if DATABASE_URL.startswith("sqlite"):
+    _ENGINE_KWARGS = {
+        "connect_args": {"check_same_thread": False},
+        "poolclass": StaticPool,
+        "echo": False,
+    }
+else:
+    # PostgreSQL: pool estándar (Supabase suele requerir pool_size limitado)
+    _ENGINE_KWARGS = {
+        "pool_size": 5,
+        "max_overflow": 10,
+        "pool_pre_ping": True,
+        "echo": False,
+    }
+
+engine = create_engine(DATABASE_URL, **_ENGINE_KWARGS)
+print(f"🛢️  Motor de BD activo: {'PostgreSQL' if ENVIRONMENT == 'production' else 'SQLite'} (ENVIRONMENT={ENVIRONMENT})")
+
+SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+Base = declarative_base()
+
+# ──────────────────────────────────────────────
+# ENUMS (Equivalentes a campos Enum de AppSheet)
+# ──────────────────────────────────────────────
+class CategoriaIngrediente(str, enum.Enum):
+    CARNES = "Carnes"
+    VERDURAS = "Verduras"
+    FRUTAS = "Frutas"
+    LACTEOS = "Lácteos"
+    GRANOS = "Granos y Cereales"
+    CONDIMENTOS = "Condimentos"
+    BEBIDAS = "Bebidas"
+    OTROS = "Otros"
+
+class UnidadMedida(str, enum.Enum):
+    KG = "kg"
+    G = "g"
+    L = "L"
+    ML = "ml"
+    UNIDAD = "unidad"
+    CAJA = "caja"
+    BOLSA = "bolsa"
+
+class EstadoAprobacion(str, enum.Enum):
+    PENDIENTE = "Pendiente"
+    APROBADO = "Aprobado"
+    RECHAZADO = "Rechazado"
+
+class TipoGasto(str, enum.Enum):
+    SERVICIOS = "Servicios"
+    INSUMOS_NO_ALIMENTICIOS = "Insumos No Alimenticios"
+    TRANSPORTE = "Transporte"
+    MANTENIMIENTO = "Mantenimiento"
+    OTROS = "Otros"
+
+class TipoMerma(str, enum.Enum):
+    VENCIMIENTO = "Vencimiento"
+    DAÑO = "Daño"
+    DERRAME = "Derrame"
+    ROBO = "Robo"
+    OTRO = "Otro"
+
+class TipoChecklist(str, enum.Enum):
+    APERTURA = "Apertura"
+    CIERRE = "Cierre"
+
+# ──────────────────────────────────────────────
+# NUEVOS ENUMS FASE 2: USUARIOS Y NOTIFICACIONES
+# ──────────────────────────────────────────────
+class RolUsuario(str, enum.Enum):
+    ADMINISTRADOR = "Administrador"    # Socios/Superusuarios - acceso total
+    ENCARGADO = "Encargado"            # Jefes de cocina - gestión operativa + aprobación
+    OPERADOR = "Operador de Cocina"     # Trabajadores - registro de datos
+    SUPER_ADMIN = "Super Admin"        # Dueño del SaaS - acceso global multi-empresa
+
+class TipoNotificacion(str, enum.Enum):
+    TAREA = "Tarea"                    # Asignaciones, recordatorios
+    ALERTA = "Alerta"                  # Stock crítico, temps fuera de rango
+    MERMA_PENDIENTE = "Merma Pendiente"  # Mermas por aprobar
+    INCIDENCIA = "Incidencia"          # Errores, rechazos, problemas críticos
+
+# ──────────────────────────────────────────────
+# MODELOS (Tablas) - Entidades Principales
+# ──────────────────────────────────────────────
+
+# ──────────────────────────────────────────────
+# MULTI-TENANT (FASE 1 SAAS)
+# Tabla raíz Empresa + mixin de aislamiento por tenant
+# ──────────────────────────────────────────────
+class Empresa(Base):
+    """Empresa/tenant dueña de los datos. Cada restaurante cliente = 1 fila."""
+    __tablename__ = "empresas"
+
+    id = Column(Integer, primary_key=True, index=True)
+    nombre = Column(String(150), nullable=False, index=True)
+    rut = Column(String(20), unique=True, nullable=False, index=True)
+    plan = Column(String(20), nullable=False, default="basic")  # basic | pro | enterprise
+    activa = Column(Boolean, default=True, index=True)
+    created_at = Column(DateTime, default=func.now())
+    updated_at = Column(DateTime, default=func.now(), onupdate=func.now())
+
+    # Branding dinámico (white-label por empresa)
+    nombre_comercial = Column(String(200), nullable=True)  # mostrado en navbar/dashboard
+    logo_url = Column(String(500), nullable=True)          # URL del logo
+    color_primario = Column(String(7), nullable=True)      # hex #RRGGBB
+    color_secundario = Column(String(7), nullable=True)    # hex #RRGGBB
+    tema = Column(String(20), nullable=False, default="claro", server_default="'claro'")    # claro | oscuro | sistema
+    favicon_url = Column(String(500), nullable=True)              # favicon personalizado
+
+    # Relaciones
+    sucursales = relationship("Sucursal", back_populates="empresa")
+
+    def __repr__(self):
+        return f"<Empresa {self.nombre} (plan={self.plan})>"
+
+
+class TenantMixin:
+    """Inyecta la columna empresa_id (FK → empresas.id) en todo modelo tenant-aware.
+    El aislamiento multi-empresa se garantiza en 3 capas:
+      1) esta columna (pertenencia física de los datos)
+      2) listener SQLAlchemy do_orm_execute (filtro automático por request)
+      3) Row Level Security de PostgreSQL (candado a nivel BD)
+    """
+    empresa_id = Column(Integer, ForeignKey("empresas.id"), nullable=False, index=True)
+
+
+class Sucursal(Base, TenantMixin):
+    """Sucursales/Locales del negocio"""
+    __tablename__ = "sucursales"
+
+    id = Column(Integer, primary_key=True, index=True)
+    nombre = Column(String(100), nullable=False, unique=True, index=True)
+    direccion = Column(Text, nullable=True)
+    activa = Column(Boolean, default=True, index=True)
+    created_at = Column(DateTime, default=func.now())
+    updated_at = Column(DateTime, default=func.now(), onupdate=func.now())
+
+    # Relaciones
+    empresa = relationship("Empresa", back_populates="sucursales")
+    usuarios = relationship("Usuario", back_populates="sucursal")
+
+    def __repr__(self):
+        return f"<Sucursal {self.nombre}>"
+
+class Usuario(Base, TenantMixin):
+    """Usuarios del sistema con roles y sucursal asignada"""
+    __tablename__ = "usuarios"
+
+    id = Column(Integer, primary_key=True, index=True)
+    nombre_completo = Column(String(150), nullable=False, index=True)
+    email = Column(String(150), unique=True, nullable=False, index=True)  # Login key
+    password_hash = Column(String(255), nullable=False)
+    rol = Column(SQLEnum(RolUsuario), nullable=False, default=RolUsuario.OPERADOR, index=True)
+    sucursal_id = Column(Integer, ForeignKey("sucursales.id"), nullable=True, index=True)
+    activo = Column(Boolean, default=True, index=True)
+    # SEGURIDAD PRIMER INGRESO: True si el usuario nace con clave temporal
+    # (creado por SuperAdmin/Admin) → get_current_user lo fuerza a /cambiar-password.
+    # default=True (ORM): todo usuario nuevo nace forzado.
+    # server_default='false': el backfill de la migración deja los existentes en False.
+    debe_cambiar_password = Column(Boolean, nullable=False, default=True, server_default="false")
+    ultimo_acceso = Column(DateTime, nullable=True)
+    created_at = Column(DateTime, default=func.now())
+    updated_at = Column(DateTime, default=func.now(), onupdate=func.now())
+
+    # Relaciones
+    sucursal = relationship("Sucursal", back_populates="usuarios")
+    mermas_registradas = relationship("RegistroMerma", back_populates="responsable_usuario", foreign_keys="RegistroMerma.responsable_usuario_id")
+    mermas_aprobadas = relationship("RegistroMerma", back_populates="aprobador_usuario", foreign_keys="RegistroMerma.aprobado_por_usuario_id")
+    gastos_registrados = relationship("ControlGasto", back_populates="responsable_usuario", foreign_keys="ControlGasto.responsable_usuario_id")
+    gastos_aprobados = relationship("ControlGasto", back_populates="aprobador_usuario", foreign_keys="ControlGasto.aprobado_por_usuario_id")
+    checklists = relationship("ListaVerificacionDiario", back_populates="responsable_usuario")
+    notificaciones = relationship("Notificacion", back_populates="usuario")
+
+    def __repr__(self):
+        return f"<Usuario {self.nombre_completo} ({self.rol.value})>"
+
+class Notificacion(Base, TenantMixin):
+    """Sistema de notificaciones/alertas push"""
+    __tablename__ = "notificaciones"
+
+    id = Column(Integer, primary_key=True, index=True)
+    usuario_id = Column(Integer, ForeignKey("usuarios.id"), nullable=False, index=True)
+    titulo = Column(String(200), nullable=False)
+    mensaje = Column(Text, nullable=False)
+    tipo = Column(SQLEnum(TipoNotificacion), nullable=False, default=TipoNotificacion.ALERTA, index=True)
+    leida = Column(Boolean, default=False, index=True)
+    fecha_creacion = Column(DateTime, default=func.now(), index=True)
+    fecha_lectura = Column(DateTime, nullable=True)
+    # Para navegación contextual
+    entidad_relacionada = Column(String(50), nullable=True)  # ej: "merma", "gasto", "temperatura"
+    entidad_id = Column(Integer, nullable=True)
+
+    # Relaciones
+    usuario = relationship("Usuario", back_populates="notificaciones")
+
+    def __repr__(self):
+        return f"<Notificacion {self.tipo.value} para {self.usuario.nombre_completo if self.usuario else 'N/A'}>"
+
+class Proveedor(Base, TenantMixin):
+    """Directorio de proveedores vinculado a compras"""
+    __tablename__ = "proveedores"
+
+    id = Column(Integer, primary_key=True, index=True)
+    nombre = Column(String(200), nullable=False, index=True)
+    contacto = Column(String(100), nullable=True)
+    telefono = Column(String(20), nullable=True)
+    email = Column(String(100), nullable=True)
+    direccion = Column(Text, nullable=True)
+    activo = Column(Boolean, default=True)
+    created_at = Column(DateTime, default=func.now())
+    updated_at = Column(DateTime, default=func.now(), onupdate=func.now())
+
+    # Relaciones
+    compras = relationship("RegistroCompra", back_populates="proveedor")
+
+    def __repr__(self):
+        return f"<Proveedor {self.nombre}>"
+
+class IngredienteStock(Base, TenantMixin):
+    """Tabla maestra de inventario - Recibe actualizaciones automáticas de entradas/salidas"""
+    __tablename__ = "ingredientes_stock"
+
+    id = Column(Integer, primary_key=True, index=True)
+    nombre = Column(String(200), nullable=False, index=True)
+    categoria = Column(SQLEnum(CategoriaIngrediente), nullable=False, default=CategoriaIngrediente.OTROS)
+    unidad_medida = Column(SQLEnum(UnidadMedida), nullable=False, default=UnidadMedida.KG)
+
+    # Stock actual con precisión decimal (evita redondeos - crítico en cocina)
+    stock_actual = Column(Float, nullable=False, default=0.0)
+    stock_minimo = Column(Float, nullable=False, default=0.0)
+    stock_maximo = Column(Float, nullable=True)
+
+    # Costos para valoración de inventario
+    costo_unitario = Column(Float, nullable=False, default=0.0)
+    costo_promedio = Column(Float, nullable=False, default=0.0)
+
+    # Control de caducidad
+    dias_alerta_vencimiento = Column(Integer, default=3)
+
+    activo = Column(Boolean, default=True)
+    created_at = Column(DateTime, default=func.now())
+    updated_at = Column(DateTime, default=func.now(), onupdate=func.now())
+
+    # Relaciones
+    detalles_compra = relationship("DetalleCompra", back_populates="ingrediente")
+    mermas = relationship("RegistroMerma", back_populates="ingrediente")
+
+    @property
+    def necesita_reposicion(self) -> bool:
+        return self.stock_actual <= self.stock_minimo
+
+    @property
+    def valor_stock(self) -> float:
+        return round(self.stock_actual * self.costo_promedio, 2)
+
+    def __repr__(self):
+        return f"<Ingrediente {self.nombre} - Stock: {self.stock_actual} {self.unidad_medida.value}>"
+
+class RegistroCompra(Base, TenantMixin):
+    """Cabecera de facturas de compra (Padre)"""
+    __tablename__ = "registro_compras"
+
+    id = Column(Integer, primary_key=True, index=True)
+    numero_factura = Column(String(50), unique=True, nullable=False, index=True)
+    proveedor_id = Column(Integer, ForeignKey("proveedores.id"), nullable=False)
+    fecha_compra = Column(Date, nullable=False, default=date.today)
+    fecha_registro = Column(DateTime, default=func.now())  # TODAY() + TIMENOW() automático
+
+    subtotal = Column(Float, nullable=False, default=0.0)
+    iva = Column(Float, nullable=False, default=0.0)
+    total = Column(Float, nullable=False, default=0.0)
+
+    foto_recibo = Column(String(500), nullable=True)  # Path o URL
+    observaciones = Column(Text, nullable=True)
+    estado = Column(SQLEnum(EstadoAprobacion), default=EstadoAprobacion.PENDIENTE)
+
+    # Auditoría - ahora con FK a Usuario
+    creado_por_usuario_id = Column(Integer, ForeignKey("usuarios.id"), nullable=True)
+    aprobado_por_usuario_id = Column(Integer, ForeignKey("usuarios.id"), nullable=True)
+    fecha_aprobacion = Column(DateTime, nullable=True)
+
+    # Relaciones
+    proveedor = relationship("Proveedor", back_populates="compras")
+    detalles = relationship("DetalleCompra", back_populates="compra", cascade="all, delete-orphan")
+    creado_por_usuario = relationship("Usuario", foreign_keys=[creado_por_usuario_id])
+    aprobado_por_usuario = relationship("Usuario", foreign_keys=[aprobado_por_usuario_id])
+
+    def __repr__(self):
+        return f"<Compra #{self.numero_factura} - {self.proveedor.nombre if self.proveedor else 'N/A'}>"
+
+class DetalleCompra(Base, TenantMixin):
+    """Líneas de detalle de compra (Hijo - Is a part of RegistroCompra)"""
+    __tablename__ = "detalle_compras"
+
+    id = Column(Integer, primary_key=True, index=True)
+    compra_id = Column(Integer, ForeignKey("registro_compras.id", ondelete="CASCADE"), nullable=False)
+    ingrediente_id = Column(Integer, ForeignKey("ingredientes_stock.id"), nullable=False)
+
+    cantidad = Column(Float, nullable=False)  # Decimal precision
+    costo_unitario = Column(Float, nullable=False)
+    costo_total = Column(Float, nullable=False)  # cantidad * costo_unitario
+
+    fecha_vencimiento = Column(Date, nullable=True)
+    lote = Column(String(50), nullable=True)
+    observaciones = Column(Text, nullable=True)
+
+    # Relaciones
+    compra = relationship("RegistroCompra", back_populates="detalles")
+    ingrediente = relationship("IngredienteStock", back_populates="detalles_compra")
+
+    def __repr__(self):
+        return f"<DetalleCompra {self.ingrediente.nombre if self.ingrediente else 'N/A'} x{self.cantidad}>"
+
+class RegistroMerma(Base, TenantMixin):
+    """Registro de mermas, vencimientos y salidas de inventario"""
+    __tablename__ = "registro_mermas"
+
+    id = Column(Integer, primary_key=True, index=True)
+    ingrediente_id = Column(Integer, ForeignKey("ingredientes_stock.id"), nullable=False)
+
+    tipo = Column(SQLEnum(TipoMerma), nullable=False, default=TipoMerma.VENCIMIENTO)
+    cantidad = Column(Float, nullable=False)  # Cantidad perdida (Decimal)
+    valor_perdida = Column(Float, nullable=False, default=0.0)  # cantidad * costo_promedio
+
+    fecha_merma = Column(Date, nullable=False, default=date.today)
+    fecha_registro = Column(DateTime, default=func.now())
+
+    # RESPONSABLE: FK a Usuario (reemplaza campo texto 'responsable')
+    responsable_usuario_id = Column(Integer, ForeignKey("usuarios.id"), nullable=True, index=True)
+    observaciones = Column(Text, nullable=True)
+    foto_evidencia = Column(String(500), nullable=True)
+
+    # Aprobación para control
+    estado = Column(SQLEnum(EstadoAprobacion), default=EstadoAprobacion.PENDIENTE)
+    # APROBADOR: FK a Usuario (reemplaza campo texto 'aprobado_por')
+    aprobado_por_usuario_id = Column(Integer, ForeignKey("usuarios.id"), nullable=True)
+    fecha_aprobacion = Column(DateTime, nullable=True)
+
+    # Relaciones
+    ingrediente = relationship("IngredienteStock", back_populates="mermas")
+    responsable_usuario = relationship("Usuario", back_populates="mermas_registradas", foreign_keys=[responsable_usuario_id])
+    aprobador_usuario = relationship("Usuario", back_populates="mermas_aprobadas", foreign_keys=[aprobado_por_usuario_id])
+
+    def __repr__(self):
+        return f"<Merma {self.tipo.value} - {self.ingrediente.nombre if self.ingrediente else 'N/A'} x{self.cantidad}>"
+
+class ControlGasto(Base, TenantMixin):
+    """Módulo financiero aislado para gastos operativos"""
+    __tablename__ = "control_gastos"
+
+    id = Column(Integer, primary_key=True, index=True)
+    tipo = Column(SQLEnum(TipoGasto), nullable=False)
+    descripcion = Column(String(300), nullable=False)
+
+    monto = Column(Float, nullable=False)  # Decimal precision
+    fecha_gasto = Column(Date, nullable=False, default=date.today)
+    fecha_registro = Column(DateTime, default=func.now())
+
+    proveedor = Column(String(200), nullable=True)  # Texto libre, no FK obligatorio
+    numero_comprobante = Column(String(50), nullable=True)
+    foto_comprobante = Column(String(500), nullable=True)
+
+    estado = Column(SQLEnum(EstadoAprobacion), default=EstadoAprobacion.PENDIENTE)
+    # RESPONSABLE: FK a Usuario (reemplaza campo texto 'aprobado_por' y agrega creador)
+    responsable_usuario_id = Column(Integer, ForeignKey("usuarios.id"), nullable=True, index=True)
+    aprobado_por_usuario_id = Column(Integer, ForeignKey("usuarios.id"), nullable=True)
+    fecha_aprobacion = Column(DateTime, nullable=True)
+
+    observaciones = Column(Text, nullable=True)
+
+    # Relaciones
+    responsable_usuario = relationship("Usuario", back_populates="gastos_registrados", foreign_keys=[responsable_usuario_id])
+    aprobador_usuario = relationship("Usuario", back_populates="gastos_aprobados", foreign_keys=[aprobado_por_usuario_id])
+
+    def __repr__(self):
+        return f"<Gasto {self.tipo.value} - ${self.monto}>"
+
+class ListaVerificacionDiario(Base, TenantMixin):
+    """Formulario de apertura y cierre de turno con firmas digitales"""
+    __tablename__ = "lista_verificacion_diario"
+
+    id = Column(Integer, primary_key=True, index=True)
+    tipo = Column(SQLEnum(TipoChecklist), nullable=False)  # APERTURA o CIERRE
+    fecha = Column(Date, nullable=False, default=date.today, index=True)
+    hora_registro = Column(Time, nullable=False, default=lambda: datetime.now().time())
+    fecha_hora_completa = Column(DateTime, default=func.now(), index=True)
+
+    # RESPONSABLE: FK a Usuario (reemplaza 'responsable_nombre')
+    responsable_usuario_id = Column(Integer, ForeignKey("usuarios.id"), nullable=False, index=True)
+    responsable_firma = Column(Text, nullable=True)  # Base64 de firma digital (Signature field)
+
+    # Checklist items (Yes/No - Interruptores rápidos)
+    # Área: Cocina
+    cocina_limpia = Column(Boolean, default=False)
+    cocina_ordenada = Column(Boolean, default=False)
+    basureros_vacios = Column(Boolean, default=False)
+
+    # Área: Equipo
+    equipos_funcionando = Column(Boolean, default=False)
+    temperaturas_ok = Column(Boolean, default=False)
+    extintores_ok = Column(Boolean, default=False)
+
+    # Área: Personal
+    uniformes_limpios = Column(Boolean, default=False)
+    manos_lavadas = Column(Boolean, default=False)
+    cabello_cubierto = Column(Boolean, default=False)
+
+    # Área: Almacén
+    almacen_ordenado = Column(Boolean, default=False)
+    sin_plagas = Column(Boolean, default=False)
+    fecha_vencimiento_revisada = Column(Boolean, default=False)
+
+    observaciones = Column(Text, nullable=True)
+    foto_evidencia = Column(String(500), nullable=True)
+
+    # Relaciones
+    responsable_usuario = relationship("Usuario", back_populates="checklists")
+
+    def __repr__(self):
+        return f"<Checklist {self.tipo.value} - {self.fecha} - {self.responsable_usuario.nombre_completo if self.responsable_usuario else 'N/A'}>"
+
+# ──────────────────────────────────────────────
+# NUEVO ENUM Y MODELO PARA REQUERIMIENTOS DE CIERRE
+# ──────────────────────────────────────────────
+class Prioridad(str, enum.Enum):
+    ALTA = "Alta"
+    MEDIA = "Media"
+    BAJA = "Baja"
+
+# ──────────────────────────────────────────────
+# ENUMS FASE 4: ALERTAS, ACADEMIA, OPERACIONES
+# ──────────────────────────────────────────────
+class TipoAlerta(str, enum.Enum):
+    AVISO = "Aviso"
+    ALERTA = "Alerta"
+    URGENTE = "Urgente"
+
+class EstadoAlerta(str, enum.Enum):
+    ACTIVA = "Activa"
+    RECONOCIDA = "Reconocida"
+    RESUELTA = "Resuelta"
+
+class EstadoCapacitacion(str, enum.Enum):
+    PENDIENTE = "Pendiente"
+    EN_PROGRESO = "En Progreso"
+    COMPLETADO = "Completado"
+    VENCIDO = "Vencido"
+
+class EstadoEjecucion(str, enum.Enum):
+    COMPLETADA = "Completada"
+    PENDIENTE = "Pendiente"
+    NO_CONFORME = "No Conforme"
+
+class TipoIncidencia(str, enum.Enum):
+    EQUIPO = "Equipo"
+    HIGIENE = "Higiene"
+    TEMPERATURA = "Temperatura"
+    SEGURIDAD = "Seguridad"
+    OTRO = "Otro"
+
+class EstadoIncidencia(str, enum.Enum):
+    ABIERTA = "Abierta"
+    EN_REVISION = "En Revisión"
+    RESUELTA = "Resuelta"
+    CERRADA = "Cerrada"
+
+class Severidad(str, enum.Enum):
+    BAJA = "Baja"
+    MEDIA = "Media"
+    ALTA = "Alta"
+    CRITICA = "Crítica"
+
+class Requerimientos(Base, TenantMixin):
+    __tablename__ = "requerimientos"
+    id = Column(Integer, primary_key=True, index=True)
+    producto = Column(String(200), nullable=False)
+    cantidad = Column(Float, nullable=False)
+    precio_estimado = Column(Float, nullable=False)
+    prioridad = Column(SQLEnum(Prioridad), nullable=False)
+    sucursal_id = Column(Integer, ForeignKey("sucursales.id"), nullable=False)
+    fecha_registro = Column(DateTime, default=func.now())
+    # Relationship
+    sucursal = relationship("Sucursal")
+
+    def __repr__(self):
+        return f"<Requerimiento {self.producto} x{self.cantidad}>"
+
+# ──────────────────────────────────────────────
+# MODELOS CONTINUACIÓN (HigienePersonal, RegistroTemperatura)
+# ──────────────────────────────────────────────
+class HigienePersonal(Base, TenantMixin):
+    """Auditoría de estándares del equipo"""
+    __tablename__ = "higiene_personal"
+
+    id = Column(Integer, primary_key=True, index=True)
+    empleado_nombre = Column(String(100), nullable=False, index=True)
+    empleado_cargo = Column(String(50), nullable=True)
+
+    fecha_auditoria = Column(Date, nullable=False, default=date.today, index=True)
+    hora_auditoria = Column(Time, nullable=False, default=lambda: datetime.now().time())
+    fecha_registro = Column(DateTime, default=func.now())
+
+    auditor_nombre = Column(String(100), nullable=False)
+    auditor_firma = Column(Text, nullable=True)
+
+    # Criterios de evaluación (Yes/No switches)
+    uñas_cortas_limpias = Column(Boolean, default=False)
+    manos_limpias = Column(Boolean, default=False)
+    sin_joyas = Column(Boolean, default=False)
+    uniforme_limpio = Column(Boolean, default=False)
+    cabello_cubierto = Column(Boolean, default=False)
+    calzado_adecuado = Column(Boolean, default=False)
+    sin_lesiones_visibles = Column(Boolean, default=False)
+    lavado_manos_correcto = Column(Boolean, default=False)
+
+    # Resultado general
+    aprobado = Column(Boolean, default=False)
+    observaciones = Column(Text, nullable=True)
+    foto_evidencia = Column(String(500), nullable=True)
+
+    @property
+    def puntuacion(self) -> int:
+        criterios = [
+            self.uñas_cortas_limpias, self.manos_limpias, self.sin_joyas,
+            self.uniforme_limpio, self.cabello_cubierto, self.calzado_adecuado,
+            self.sin_lesiones_visibles, self.lavado_manos_correcto
+        ]
+        return sum(criterios)
+
+    def __repr__(self):
+        return f"<Higiene {self.empleado_nombre} - {self.fecha_auditoria} - {'Aprobado' if self.aprobado else 'Rechazado'}>"
+
+class RegistroTemperatura(Base, TenantMixin):
+    """Control de cadena de frío de equipos"""
+    __tablename__ = "registro_temperaturas"
+
+    id = Column(Integer, primary_key=True, index=True)
+    equipo_nombre = Column(String(100), nullable=False, index=True)  # Ej: "Nevera 1", "Freezer Cocina"
+    equipo_ubicacion = Column(String(100), nullable=True)
+
+    temperatura = Column(Float, nullable=False)  # Decimal precision crítico
+    temperatura_objetivo_min = Column(Float, nullable=False, default=0.0)
+    temperatura_objetivo_max = Column(Float, nullable=False, default=4.0)
+
+    fecha_medicion = Column(Date, nullable=False, default=date.today, index=True)
+    hora_medicion = Column(Time, nullable=False, default=lambda: datetime.now().time())
+    fecha_registro = Column(DateTime, default=func.now(), index=True)
+
+    responsable = Column(String(100), nullable=False)  # Se mantiene texto por simplicidad (puede ser FK en futura versión)
+    responsable_firma = Column(Text, nullable=True)
+
+    # Estado automático
+    dentro_rango = Column(Boolean, default=False)
+
+    observaciones = Column(Text, nullable=True)
+    foto_evidencia = Column(String(500), nullable=True)
+
+    @property
+    def esta_en_rango(self) -> bool:
+        return self.temperatura_objetivo_min <= self.temperatura <= self.temperatura_objetivo_max
+
+    def __repr__(self):
+        status = "✓" if self.dentro_rango else "⚠"
+        return f"<Temp {self.equipo_nombre}: {self.temperatura}°C {status}>"
+
+
+# ──────────────────────────────────────────────
+# MODELOS FASE 4: ALERTAS, ACADEMIA, OPERACIONES
+# ──────────────────────────────────────────────
+
+class Alerta(Base, TenantMixin):
+    """Sistema de alertas: avisos, alertas y urgentes por empresa"""
+    __tablename__ = "alertas"
+
+    id = Column(Integer, primary_key=True, index=True)
+    tipo = Column(SQLEnum(TipoAlerta), nullable=False, default=TipoAlerta.AVISO, index=True)
+    titulo = Column(String(200), nullable=False)
+    mensaje = Column(Text, nullable=False)
+    estado = Column(SQLEnum(EstadoAlerta), nullable=False, default=EstadoAlerta.ACTIVA, index=True)
+    entidad_tipo = Column(String(50), nullable=True)
+    entidad_id = Column(Integer, nullable=True)
+    usuario_creador_id = Column(Integer, ForeignKey("usuarios.id"), nullable=True)
+    usuario_asignado_id = Column(Integer, ForeignKey("usuarios.id"), nullable=True)
+    fecha_creacion = Column(DateTime, default=func.now())
+    fecha_resuelta = Column(DateTime, nullable=True)
+    created_at = Column(DateTime, default=func.now())
+    updated_at = Column(DateTime, default=func.now(), onupdate=func.now())
+
+    creador = relationship("Usuario", foreign_keys=[usuario_creador_id])
+    asignado = relationship("Usuario", foreign_keys=[usuario_asignado_id])
+
+    def __repr__(self):
+        return f"<Alerta {self.tipo.value}: {self.titulo[:30]}>"
+
+
+class Curso(Base, TenantMixin):
+    """Catálogo de cursos de la Academia"""
+    __tablename__ = "cursos"
+
+    id = Column(Integer, primary_key=True, index=True)
+    titulo = Column(String(200), nullable=False)
+    descripcion = Column(Text, nullable=True)
+    duracion_minutos = Column(Integer, nullable=True)
+    url_contenido = Column(String(500), nullable=True)
+    obligatorio = Column(Boolean, default=False)
+    activo = Column(Boolean, default=True)
+    created_at = Column(DateTime, default=func.now())
+    updated_at = Column(DateTime, default=func.now(), onupdate=func.now())
+
+    capacitaciones = relationship("CapacitacionUsuario", back_populates="curso")
+
+    def __repr__(self):
+        return f"<Curso {self.titulo}>"
+
+
+class CapacitacionUsuario(Base, TenantMixin):
+    """Tracking de capacitación por empleado: estado de completitud por curso"""
+    __tablename__ = "capacitaciones_usuarios"
+
+    id = Column(Integer, primary_key=True, index=True)
+    usuario_id = Column(Integer, ForeignKey("usuarios.id"), nullable=False, index=True)
+    curso_id = Column(Integer, ForeignKey("cursos.id"), nullable=False, index=True)
+    estado = Column(SQLEnum(EstadoCapacitacion), nullable=False, default=EstadoCapacitacion.PENDIENTE, index=True)
+    fecha_inicio = Column(DateTime, nullable=True)
+    fecha_completado = Column(DateTime, nullable=True)
+    puntuacion = Column(Float, nullable=True)
+    certificado_url = Column(String(500), nullable=True)
+    created_at = Column(DateTime, default=func.now())
+    updated_at = Column(DateTime, default=func.now(), onupdate=func.now())
+
+    usuario = relationship("Usuario")
+    curso = relationship("Curso", back_populates="capacitaciones")
+
+    def __repr__(self):
+        return f"<Capacitacion usuario={self.usuario_id} curso={self.curso_id} {self.estado.value}>"
+
+
+class EjecucionChecklist(Base, TenantMixin):
+    """Ejecución real de una plantilla de checklist (Apertura/Cierre)"""
+    __tablename__ = "ejecuciones_checklist"
+
+    id = Column(Integer, primary_key=True, index=True)
+    checklist_id = Column(Integer, ForeignKey("lista_verificacion_diario.id"), nullable=False, index=True)
+    usuario_id = Column(Integer, ForeignKey("usuarios.id"), nullable=False, index=True)
+    fecha_ejecucion = Column(Date, nullable=False, default=date.today, index=True)
+    hora_ejecucion = Column(Time, nullable=False, default=lambda: datetime.now().time())
+    estado = Column(SQLEnum(EstadoEjecucion), nullable=False, default=EstadoEjecucion.PENDIENTE, index=True)
+    observaciones = Column(Text, nullable=True)
+    firma = Column(Text, nullable=True)
+    created_at = Column(DateTime, default=func.now())
+    updated_at = Column(DateTime, default=func.now(), onupdate=func.now())
+
+    checklist = relationship("ListaVerificacionDiario")
+    usuario = relationship("Usuario")
+
+    def __repr__(self):
+        return f"<EjecucionChecklist {self.checklist_id} {self.estado.value}>"
+
+
+class Evidencia(Base, TenantMixin):
+    """Fotos/archivos vinculados polimórficamente a cualquier entidad operativa"""
+    __tablename__ = "evidencias"
+
+    id = Column(Integer, primary_key=True, index=True)
+    entidad_tipo = Column(String(50), nullable=False, index=True)
+    entidad_id = Column(Integer, nullable=False, index=True)
+    url_foto = Column(String(500), nullable=False)
+    descripcion = Column(String(300), nullable=True)
+    usuario_id = Column(Integer, ForeignKey("usuarios.id"), nullable=False, index=True)
+    fecha_subida = Column(DateTime, default=func.now())
+    created_at = Column(DateTime, default=func.now())
+
+    usuario = relationship("Usuario")
+
+    def __repr__(self):
+        return f"<Evidencia {self.entidad_tipo}:{self.entidad_id}>"
+
+
+class Incidencia(Base, TenantMixin):
+    """Incidencias operativas: fallas, eventos, no-conformidades"""
+    __tablename__ = "incidencias"
+
+    id = Column(Integer, primary_key=True, index=True)
+    tipo = Column(SQLEnum(TipoIncidencia), nullable=False, default=TipoIncidencia.OTRO, index=True)
+    titulo = Column(String(200), nullable=False)
+    descripcion = Column(Text, nullable=True)
+    estado = Column(SQLEnum(EstadoIncidencia), nullable=False, default=EstadoIncidencia.ABIERTA, index=True)
+    severidad = Column(SQLEnum(Severidad), nullable=False, default=Severidad.MEDIA)
+    reportado_por_id = Column(Integer, ForeignKey("usuarios.id"), nullable=False, index=True)
+    asignado_a_id = Column(Integer, ForeignKey("usuarios.id"), nullable=True)
+    fecha_reporte = Column(DateTime, default=func.now())
+    fecha_resolucion = Column(DateTime, nullable=True)
+    created_at = Column(DateTime, default=func.now())
+    updated_at = Column(DateTime, default=func.now(), onupdate=func.now())
+
+    reportado_por = relationship("Usuario", foreign_keys=[reportado_por_id])
+    asignado_a = relationship("Usuario", foreign_keys=[asignado_a_id])
+
+    def __repr__(self):
+        return f"<Incidencia {self.tipo.value}: {self.titulo[:30]} ({self.estado.value})>"
+
+
+# ──────────────────────────────────────────────
+# FUNCIONES DE UTILIDAD
+# ──────────────────────────────────────────────
+def init_db():
+    """Crea todas las tablas en la base de datos"""
+    Base.metadata.create_all(bind=engine)
+    print("✅ Base de datos inicializada correctamente")
+
+def get_db() -> Session:
+    """Dependency para FastAPI - proporciona sesión de BD"""
+    db = SessionLocal()
+    try:
+        yield db
+    finally:
+        db.close()
+
+def seed_initial_data(db: Session):
+    """Pobla datos iniciales si las tablas están vacías"""
+    # Verificar si ya hay datos
+    if db.query(Proveedor).first():
+        return
+
+    # 1. SUCURSALES
+    sucursales = [
+        Sucursal(nombre="Casa Matriz", direccion="Av. Principal 123, Santiago"),
+        Sucursal(nombre="Sucursal Norte", direccion="Calle Norte 456, Santiago"),
+    ]
+    db.add_all(sucursales)
+    db.flush()
+
+    # 2. USUARIOS (password: "123456" hasheado con bcrypt)
+    # Hash bcrypt de "123456" con costo 12
+    pwd_hash = "$2b$12$R3iza9Iucq3fNLtQzTRrp.quDa578OWw851aYsloikUR5.KEh7U06"
+
+    usuarios = [
+        Usuario(
+            nombre_completo="Admin Principal",
+            email="admin@erp.cl",
+            password_hash=pwd_hash,
+            rol=RolUsuario.ADMINISTRADOR,
+            sucursal_id=sucursales[0].id,
+            debe_cambiar_password=False,  # usuario raíz de desarrollo, nunca forzado
+        ),
+        Usuario(
+            nombre_completo="Chef Encargado",
+            email="encargado@erp.cl",
+            password_hash=pwd_hash,
+            rol=RolUsuario.ENCARGADO,
+            sucursal_id=sucursales[0].id,
+        ),
+        Usuario(
+            nombre_completo="Operador Cocina",
+            email="operador@erp.cl",
+            password_hash=pwd_hash,
+            rol=RolUsuario.OPERADOR,
+            sucursal_id=sucursales[0].id,
+        ),
+        Usuario(
+            nombre_completo="Chef Norte",
+            email="norte@erp.cl",
+            password_hash=pwd_hash,
+            rol=RolUsuario.ENCARGADO,
+            sucursal_id=sucursales[1].id,
+        ),
+    ]
+    db.add_all(usuarios)
+    db.flush()
+
+    # 3. PROVEEDORES
+    proveedores = [
+        Proveedor(nombre="Distribuidora Central", contacto="Juan Pérez", telefono="+569****5678", email="ventas@distcentral.cl"),
+        Proveedor(nombre="Frutas y Verduras El Huerto", contacto="María González", telefono="+569****4321", email="pedidos@elhuerto.cl"),
+        Proveedor(nombre="Carnes Premium S.A.", contacto="Carlos Ruiz", telefono="+569****4455", email="comercial@carnespremium.cl"),
+        Proveedor(nombre="Lácteos del Sur", contacto="Ana Torres", telefono="+569****5566", email="ventas@lacteossur.cl"),
+    ]
+    db.add_all(proveedores)
+    db.flush()
+
+    # 4. INGREDIENTES BASE
+    ingredientes = [
+        IngredienteStock(nombre="Tomate", categoria=CategoriaIngrediente.VERDURAS, unidad_medida=UnidadMedida.KG, stock_actual=15.5, stock_minimo=5.0, costo_unitario=1200, costo_promedio=1200),
+        IngredienteStock(nombre="Cebolla", categoria=CategoriaIngrediente.VERDURAS, unidad_medida=UnidadMedida.KG, stock_actual=20.0, stock_minimo=8.0, costo_unitario=800, costo_promedio=800),
+        IngredienteStock(nombre="Pollo Pechuga", categoria=CategoriaIngrediente.CARNES, unidad_medida=UnidadMedida.KG, stock_actual=10.0, stock_minimo=5.0, costo_unitario=4500, costo_promedio=4500),
+        IngredienteStock(nombre="Arroz", categoria=CategoriaIngrediente.GRANOS, unidad_medida=UnidadMedida.KG, stock_actual=50.0, stock_minimo=10.0, costo_unitario=1100, costo_promedio=1100),
+        IngredienteStock(nombre="Aceite Oliva", categoria=CategoriaIngrediente.CONDIMENTOS, unidad_medida=UnidadMedida.L, stock_actual=8.0, stock_minimo=3.0, costo_unitario=6500, costo_promedio=6500),
+        IngredienteStock(nombre="Leche Entera", categoria=CategoriaIngrediente.LACTEOS, unidad_medida=UnidadMedida.L, stock_actual=24.0, stock_minimo=12.0, costo_unitario=950, costo_promedio=950),
+        IngredienteStock(nombre="Queso Mozzarella", categoria=CategoriaIngrediente.LACTEOS, unidad_medida=UnidadMedida.KG, stock_actual=5.0, stock_minimo=2.0, costo_unitario=5800, costo_promedio=5800),
+        IngredienteStock(nombre="Pimiento Rojo", categoria=CategoriaIngrediente.VERDURAS, unidad_medida=UnidadMedida.KG, stock_actual=8.0, stock_minimo=3.0, costo_unitario=2200, costo_promedio=2200),
+    ]
+    db.add_all(ingredientes)
+
+    # 5. NOTIFICACIONES DE EJEMPLO
+    notificaciones = [
+        Notificacion(
+            usuario_id=usuarios[0].id,
+            titulo="Bienvenido al ERP",
+            mensaje="Sistema inicializado correctamente. Comienza a registrar tus operaciones.",
+            tipo=TipoNotificacion.TAREA,
+        ),
+        Notificacion(
+            usuario_id=usuarios[1].id,
+            titulo="Stock crítico detectado",
+            mensaje="El ingrediente 'Tomate' ha alcanzado su stock mínimo. Revisar inventario.",
+            tipo=TipoNotificacion.ALERTA,
+            entidad_relacionada="ingrediente",
+            entidad_id=1,
+        ),
+    ]
+    db.add_all(notificaciones)
+
+    db.commit()
+    print("✅ Datos iniciales cargados (sucursales, usuarios, proveedores, ingredientes, notificaciones)")
+
+
+
+# Modelo StockSucursal - Stock por ingrediente por sucursal (para multi-sucursal)
+class StockSucursal(Base, TenantMixin):
+    """Stock de cada ingrediente en cada sucursal - permite inventario distribuido"""
+    __tablename__ = "stock_sucursal"
+
+    id = Column(Integer, primary_key=True, index=True)
+    ingrediente_id = Column(Integer, ForeignKey("ingredientes_stock.id"), nullable=False)
+    sucursal_id = Column(Integer, ForeignKey("sucursales.id"), nullable=False)
+    stock_actual = Column(Float, nullable=False, default=0.0)
+    created_at = Column(DateTime, default=func.now())
+    updated_at = Column(DateTime, default=func.now(), onupdate=func.now())
+
+    # Relaciones
+    ingrediente = relationship("IngredienteStock")
+    sucursal = relationship("Sucursal")
+
+    # Constraint único por ingrediente-sucursal
+    __table_args__ = (
+        UniqueConstraint('ingrediente_id', 'sucursal_id', 'empresa_id', name='uq_stock_ingrediente_sucursal_empresa'),
+    )
+
+    @property
+    def valor_stock(self) -> float:
+        return round(self.stock_actual * (self.ingrediente.costo_promedio if self.ingrediente else 0.0), 2)
+
+    def __repr__(self):
+        return f"<StockSucursal ingrediente={self.ingrediente_id} sucursal={self.sucursal_id} stock={self.stock_actual}>"
+
+
+
+
+# Modelo StockSucursal - Stock por ingrediente por sucursal (para multi-sucursal)
+# Enums para ConteoFisico.estado
+class EstadoConteo(str, enum.Enum):
+    BORRADOR = "Borrador"
+    EN_CONTEO = "En_Conteo"
+    REVISION = "Revision"
+    CERRADO = "Cerrado"
+
+
+# ──────────────────────────────────────────────
+# FASE 3: INVENTARIO FÍSICO
+# ──────────────────────────────────────────────
+
+class PlantillaInventario(Base, TenantMixin):
+    """Plantilla de inventario predefinida para agilizar conteos físicos"""
+    __tablename__ = "plantillas_inventario"
+
+    id = Column(Integer, primary_key=True, index=True)
+    nombre = Column(String(100), nullable=False, unique=True)
+    descripcion = Column(Text, nullable=True)
+    activo = Column(Boolean, nullable=False, default=True)
+    fecha_creacion = Column(DateTime, default=func.now())
+    fecha_actualizacion = Column(DateTime, default=func.now(), onupdate=func.now())
+
+    # Relaciones
+    conteos = relationship("ConteoFisico", back_populates="plantilla")
+
+    def __repr__(self):
+        return f"<PlantillaInventario {self.nombre}>"
+
+
+class ConteoFisico(Base, TenantMixin):
+    """Evento de conteo físico de inventario"""
+    __tablename__ = "conteos_fisicos"
+
+    id = Column(Integer, primary_key=True, index=True)
+    plantilla_id = Column(Integer, ForeignKey('plantillas_inventario.id'), nullable=True)
+    fecha = Column(Date, nullable=False)
+    responsable_id = Column(Integer, ForeignKey('usuarios.id'), nullable=False)
+    estado = Column(SQLEnum(EstadoConteo, name='estado_conteo'), nullable=False, default=EstadoConteo.BORRADOR)
+    sucursal_id = Column(Integer, ForeignKey('sucursales.id'), nullable=False)
+    observaciones = Column(Text, nullable=True)
+
+    # Relaciones
+    plantilla = relationship('PlantillaInventario', back_populates='conteos')
+    responsable = relationship('Usuario')
+    sucursal = relationship('Sucursal')
+    items = relationship('ItemConteo', back_populates='conteo', cascade='all, delete-orphan')
+    ajustes = relationship('AjusteInventario', back_populates='conteo', cascade='all, delete-orphan')
+
+    def __repr__(self):
+        return f"<ConteoFisico {self.fecha} {self.estado.value}>"
+
+
+class ItemConteo(Base, TenantMixin):
+    """Detalle de cada ingrediente en un conteo físico"""
+    __tablename__ = "items_conteo"
+
+    id = Column(Integer, primary_key=True, index=True)
+    conteo_id = Column(Integer, ForeignKey('conteos_fisicos.id'), nullable=False)
+    ingrediente_id = Column(Integer, ForeignKey('ingredientes_stock.id'), nullable=False)
+    stock_teorico_sistema = Column(Float, nullable=False)  # Stock en sistema al iniciar conteo
+    stock_real_contado = Column(Float, nullable=False)     # Cantidad física contada
+    diferencia_calculada = Column(Float, nullable=False)   # stock_real_contado - stock_teorico_sistema
+
+    # Relaciones
+    conteo = relationship('ConteoFisico', back_populates='items')
+    ingrediente = relationship('IngredienteStock')
+
+    def __repr__(self):
+        return f"<ItemConteo conteo={self.conteo_id} ingrediente={self.ingrediente_id} diff={self.diferencia_calculada}>"
+
+
+class AjusteInventario(Base, TenantMixin):
+    """Registro de auditoría cuando se aprueba un conteo y se ajusta el stock"""
+    __tablename__ = "ajustes_inventario"
+
+    id = Column(Integer, primary_key=True, index=True)
+    conteo_id = Column(Integer, ForeignKey('conteos_fisicos.id'), nullable=False)
+    ingrediente_id = Column(Integer, ForeignKey('ingredientes_stock.id'), nullable=False)
+    stock_anterior = Column(Float, nullable=False)   # Stock en StockSucursal antes del ajuste
+    stock_nuevo = Column(Float, nullable=False)      # Stock asignado tras el ajuste (generalmente = stock_real_contado)
+    motivo = Column(String(200), nullable=False, default='Ajuste por conteo físico')
+    valor_ajuste = Column(Float, nullable=False)     # stock_nuevo - stock_anterior (impacto económico)
+    responsable_id = Column(Integer, ForeignKey('usuarios.id'), nullable=False)
+    fecha_ajuste = Column(DateTime, nullable=False, default=func.now())
+
+    # Relaciones
+    conteo = relationship('ConteoFisico', back_populates='ajustes')
+    ingrediente = relationship('IngredienteStock')
+    responsable = relationship('Usuario')
+
+    def __repr__(self):
+        return f"<AjusteInventario conteo={self.conteo_id} ingrediente={self.ingrediente_id} ajuste={self.valor_ajuste}>"
+
+
+if __name__ == "__main__":
+    init_db()
+    db = SessionLocal()
+    seed_initial_data(db)
+    db.close()
