@@ -113,9 +113,11 @@
         <select id="sucursal-select" name="sucursal_id" class="border border-gray-300 rounded-md shadow-sm px-2 py-1 bg-white text-sm"
                 onchange="if(this.value) window.location.href = window.location.pathname + '?sucursal_id=' + this.value;">
             <option value="">Todas las sucursales</option>
-            {% for s in sucursales %}
-            <option value="{{ s.id }}" {% if sucursal_id|string == s.id|string %}selected{% endif %}>{{ s.nombre }}</option>
-            {% endfor %}
+            <optgroup label="{{ empresa.nombre_comercial or empresa.nombre }}">
+                {% for s in sucursales %}
+                <option value="{{ s.id }}" {% if sucursal_id|string == s.id|string %}selected{% endif %}>{{ s.nombre }}</option>
+                {% endfor %}
+            </optgroup>
         </select>
     </div>
 
@@ -230,9 +232,11 @@
         <select id="sucursal-select-mobile" name="sucursal_id" class="block w-full border border-gray-300 rounded-md shadow-sm px-3 py-2 bg-white text-sm"
                 onchange="if(this.value) window.location.href = window.location.pathname + '?sucursal_id=' + this.value;">
             <option value="">Todas las sucursales</option>
-            {% for s in sucursales %}
-            <option value="{{ s.id }}" {% if sucursal_id|string == s.id|string %}selected{% endif %}>{{ s.nombre }}</option>
-            {% endfor %}
+            <optgroup label="{{ empresa.nombre_comercial or empresa.nombre }}">
+                {% for s in sucursales %}
+                <option value="{{ s.id }}" {% if sucursal_id|string == s.id|string %}selected{% endif %}>{{ s.nombre }}</option>
+                {% endfor %}
+            </optgroup>
         </select>
     </div>
 
