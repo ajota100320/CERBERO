@@ -192,6 +192,23 @@ async def get_current_user(request: Request, db: Session = Depends(get_db)) -> O
 # ──────────────────────────────────────────────
 # DEPENDENCIAS DE SEGURIDAD JERÁRQUICA (RBAC)
 # ──────────────────────────────────────────────
+
+# ──────────────────────────────────────────────
+# DEPENDENCIA GENÉRICA DE ROLES
+# ──────────────────────────────────────────────
+def require_roles(*allowed_roles):
+    """Devuelve una dependency que requiere que el usuario tenga uno de los roles permitidos."""
+    def role_checker(current_user: Usuario = Depends(get_current_user)):
+        if current_user is None:
+            raise HTTPException(status_code=401, detail="Not authenticated")
+        if current_user.rol not in allowed_roles:
+            raise HTTPException(status_code=403, detail="Insufficient permissions")
+        return current_user
+    return role_checker
+
+# ──────────────────────────────────────────────
+# DEPENDENCIA GENÉRICA DE ROLES
+# ──────────────────────────────────────────────
 async def get_admin_user(current_user: Usuario = Depends(require_roles(RolUsuario.ADMINISTRADOR, RolUsuario.SUPER_ADMIN))) -> Usuario:
     """Requiere rol ADMINISTRADOR o SUPER_ADMIN."""
     return current_user
@@ -202,10 +219,7 @@ async def get_super_admin_user(current_user: Usuario = Depends(require_roles(Rol
     """Requiere rol SUPER_ADMIN."""
     return current_user
 
-# ──────────────────────────────────────────────
-# DEPENDENCIA GENÉRICA DE ROLES
-# ──────────────────────────────────────────────
-def require_roles(*allowed_roles):
+
     """Devuelve una dependency que requiere que el usuario tenga uno de los roles permitidos."""
     def role_checker(current_user: Usuario = Depends(get_current_user)):
         if current_user is None:
@@ -1710,7 +1724,7 @@ async def inventario_fisico_finalizar(
 async def inventario_fisico_plantillas(
     request: Request,
     db: Session = Depends(get_db),
-    current_user: Usuario = Depends(require_admin)
+    current_user: Usuario = Depends(get_admin_user)
 ):
     """Gestión de plantillas de inventario (solo Admin)"""
     tenant_id = tenant_context.get()
@@ -2665,7 +2679,7 @@ async def create_compra(
 async def list_usuarios(
     request: Request,
     db: Session = Depends(get_db),
-    user: Usuario = Depends(require_admin),
+    user: Usuario = Depends(get_admin_user),
 ):
     """Lista todos los usuarios y sucursales. Solo ADMINISTRADOR."""
     usuarios = db.query(Usuario).order_by(Usuario.rol, Usuario.nombre_completo).all()
