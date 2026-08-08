@@ -1,0 +1,71 @@
+{% extends "base.html" %}
+{% block title %}Ejecutar Checklist · {{ empresa.nombre_comercial if empresa else 'ERP' }}{% endblock %}
+{% block content %}
+<div class="max-w-2xl mx-auto px-4 py-8">
+    <h1 class="text-2xl font-bold text-gray-900 mb-1">{{ checklist.tipo.value }} — {{ checklist.fecha.strftime('%d/%m/%Y') if checklist.fecha else '' }}</h1>
+    <p class="text-gray-500 text-sm mb-6">Responsable: {{ checklist.responsable_usuario.nombre_completo if checklist.responsable_usuario else (checklist.responsable or '-') }}</p>
+
+    {% if request.query_params.get('ok') == '1' %}
+    <div class="bg-green-50 border border-green-200 text-green-800 px-4 py-3 rounded-lg mb-6">✅ Ejecución registrada.</div>
+    {% endif %}
+
+    <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-6 mb-6">
+        <h2 class="font-semibold text-gray-700 mb-4">Registrar nueva ejecución</h2>
+        <form method="post" class="space-y-4">
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">Estado</label>
+                <select name="estado" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm">
+                    {% for e in estados %}<option value="{{ e.value }}">{{ e.value }}</option>{% endfor %}
+                </select>
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">Observaciones</label>
+                <textarea name="observaciones" rows="2" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm" placeholder="Notas de la ejecución..."></textarea>
+            </div>
+            <div class="flex items-center justify-between">
+                <a href="/operaciones" class="text-sm text-gray-500 hover:text-gray-700">← Volver</a>
+                <button type="submit" class="px-6 py-2 bg-primary-600 text-white rounded-lg text-sm font-medium hover:bg-primary-700">
+                    Guardar Ejecución
+                </button>
+            </div>
+        </form>
+    </div>
+
+    {% if ejecuciones %}
+    <div class="bg-white rounded-xl shadow-sm border border-gray-200">
+        <div class="px-6 py-4 border-b border-gray-200">
+            <h2 class="font-semibold text-gray-700">Ejecuciones anteriores</h2>
+        </div>
+        <div class="overflow-x-auto">
+            <table class="w-full text-sm">
+                <thead class="bg-gray-50">
+                    <tr>
+                        <th class="px-4 py-2 text-left text-gray-500">Fecha</th>
+                        <th class="px-4 py-2 text-left text-gray-500">Usuario</th>
+                        <th class="px-4 py-2 text-left text-gray-500">Estado</th>
+                        <th class="px-4 py-2 text-left text-gray-500">Obs.</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-gray-100">
+                    {% for ej in ejecuciones %}
+                    <tr>
+                        <td class="px-4 py-2 text-gray-900">{{ ej.fecha_ejecucion.strftime('%d/%m') }} {{ ej.hora_ejecucion.strftime('%H:%M') if ej.hora_ejecucion else '' }}</td>
+                        <td class="px-4 py-2 text-gray-500">{{ ej.usuario.nombre_completo if ej.usuario else '-' }}</td>
+                        <td class="px-4 py-2">
+                            <span class="px-2 py-0.5 rounded text-xs font-medium
+                                {% if ej.estado.value == 'Completada' %}bg-green-100 text-green-800
+                                {% elif ej.estado.value == 'Pendiente' %}bg-yellow-100 text-yellow-800
+                                {% else %}bg-red-100 text-red-800{% endif %}">
+                                {{ ej.estado.value }}
+                            </span>
+                        </td>
+                        <td class="px-4 py-2 text-gray-500 text-xs">{{ ej.observaciones or '-' }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

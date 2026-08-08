@@ -1,0 +1,212 @@
+{% extends "base.html" %}
+{% block title %}Inventario & Mermas · {{ empresa.nombre_comercial if empresa else 'ERP' }}{% endblock %}
+{% block content %}
+<div class="max-w-7xl mx-auto px-4 py-6">
+    <div class="flex items-center justify-between mb-6">
+        <div>
+            <h1 class="text-2xl font-bold text-gray-900">📦 Inventario & Mermas 2.0</h1>
+            <p class="text-gray-500 text-sm">Stock por sucursal + Registro y aprobación de mermas</p>
+        </div>
+        <div class="flex gap-2">
+            <a href="/mermas/nueva" class="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg text-sm font-medium transition-colors">
+                ⚠️ Reportar Merma
+            </a>
+        </div>
+    </div>
+
+    {# ── Tabs ────────────────────────────────────────────── #}
+    <div class="border-b border-gray-200 mb-4">
+        <nav class="flex space-x-4" aria-label="Tabs">
+            <button class="tab-btn px-4 py-2 text-sm font-medium text-primary-600 border-b-2 border-primary-600" data-tab="stock">📊 Stock por Sucursal</button>
+            <button class="tab-btn px-4 py-2 text-sm font-medium text-gray-500 hover:text-gray-700" data-tab="mermas">📋 Mermas Registradas</button>
+            <button class="tab-btn px-4 py-2 text-sm font-medium text-gray-500 hover:text-gray-700" data-tab="nueva">➕ Nueva Merma</button>
+        </nav>
+    </div>
+
+    {# ── Tab 1: Stock por Sucursal ──────────────────────── #}
+    <div class="tab-panel" id="panel-stock">
+        {% if stock_sucursales %}
+        <div class="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+            <div class="overflow-x-auto">
+                <table class="w-full text-sm">
+                    <thead class="bg-gray-50">
+                        <tr>
+                            <th class="px-4 py-3 text-left font-medium text-gray-500">Ingrediente</th>
+                            <th class="px-4 py-3 text-left font-medium text-gray-500">Sucursal</th>
+                            <th class="px-4 py-3 text-right font-medium text-gray-500">Stock Actual</th>
+                            <th class="px-4 py-3 text-right font-medium text-gray-500">Mínimo</th>
+                            <th class="px-4 py-3 text-right font-medium text-gray-500">Máximo</th>
+                            <th class="px-4 py-3 text-left font-medium text-gray-500">Estado</th>
+                            <th class="px-4 py-3 text-right font-medium text-gray-500">Valor Stock</th>
+                            <th class="px-4 py-3 text-left font-medium text-gray-500">Actualizado</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-gray-100">
+                        {% for s in stock_sucursales %}
+                        <tr class="hover:bg-gray-50">
+                            <td class="px-4 py-3 text-gray-900 font-medium">{{ s.ingrediente.nombre }}</td>
+                            <td class="px-4 py-3 text-gray-500">{{ s.sucursal.nombre if s.sucursal else '—' }}</td>
+                            <td class="px-4 py-3 text-right text-gray-900">{{ "%.2f"|format(s.stock_actual) }} {{ s.ingrediente.unidad_medida.value }}</td>
+                            <td class="px-4 py-3 text-right text-gray-500">{{ "%.2f"|format(s.stock_minimo) }}</td>
+                            <td class="px-4 py-3 text-right text-gray-500">{{ "%.2f"|format(s.stock_maximo) if s.stock_maximo else '—' }}</td>
+                            <td class="px-4 py-3">
+                                {% if s.necesita_reposicion %}
+                                <span class="px-2 py-1 rounded-full text-xs font-medium bg-red-100 text-red-800">🔴 Reponer</span>
+                                {% else %}
+                                <span class="px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">🟢 OK</span>
+                                {% endif %}
+                            </td>
+                            <td class="px-4 py-3 text-right text-gray-700">${{ "%.2f"|format(s.valor_stock) }}</td>
+                            <td class="px-4 py-3 text-right text-gray-400 text-xs">{{ s.ultima_actualizacion.strftime('%d/%m %H:%M') if s.ultima_actualizacion else '-' }}</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+        {% else %}
+        <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-8 text-center text-gray-400">
+            No hay stock por sucursal configurado. Crea stock en <a href="/inventario/nueva" class="text-primary-600 hover:underline">Inventario</a>.
+        </div>
+        {% endif %}
+    </div>
+
+    {# ── Tab 2: Mermas Registradas ─────────────────────── #}
+    <div class="tab-panel hidden" id="panel-mermas">
+        {% if mermas %}
+        <div class="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+            <div class="overflow-x-auto">
+                <table class="w-full text-sm">
+                    <thead class="bg-gray-50">
+                        <tr>
+                            <th class="px-4 py-3 text-left font-medium text-gray-500">Fecha</th>
+                            <th class="px-4 py-3 text-left font-medium text-gray-500">Ingrediente</th>
+                            <th class="px-4 py-3 text-left font-medium text-gray-500">Sucursal</th>
+                            <th class="px-4 py-3 text-left font-medium text-gray-500">Tipo</th>
+                            <th class="px-4 py-3 text-right font-medium text-gray-500">Cantidad</th>
+                            <th class="px-4 py-3 text-right font-medium text-gray-500">Valor</th>
+                            <th class="px-4 py-3 text-left font-medium text-gray-500">Estado</th>
+                            <th class="px-4 py-3 text-left font-medium text-gray-500">Reportado</th>
+                            <th class="px-4 py-3 text-left font-medium text-gray-500">Acciones</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-gray-100">
+                        {% for m in mermas %}
+                        <tr class="hover:bg-gray-50">
+                            <td class="px-4 py-3 text-gray-500 text-xs">{{ m.fecha_merma.strftime('%d/%m/%Y') }} {{ m.fecha_registro.strftime('%H:%M') }}</td>
+                            <td class="px-4 py-3 text-gray-900">{{ m.ingrediente.nombre if m.ingrediente else 'N/A' }}</td>
+                            <td class="px-4 py-3 text-gray-500">{{ m.sucursal.nombre if m.sucursal else 'Global' }}</td>
+                            <td class="px-4 py-3">
+                                <span class="px-2 py-0.5 rounded text-xs font-medium
+                                    {% if m.tipo.value == 'Vencimiento' %}bg-yellow-100 text-yellow-800
+                                    {% elif m.tipo.value == 'Daño' %}bg-red-100 text-red-800
+                                    {% elif m.tipo.value == 'Derrame' %}bg-blue-100 text-blue-800
+                                    {% elif m.tipo.value == 'Preparación Incorrecta' %}bg-orange-100 text-orange-800
+                                    {% else %}bg-gray-100 text-gray-800{% endif %}">
+                                    {{ m.tipo.value }}
+                                </span>
+                            </td>
+                            <td class="px-4 py-3 text-right">{{ "%.2f"|format(m.cantidad) }} {{ m.ingrediente.unidad_medida.value if m.ingrediente else '' }}</td>
+                            <td class="px-4 py-3 text-right text-gray-700">${{ "%.2f"|format(m.valor_perdida) }}</td>
+                            <td class="px-4 py-3">
+                                {% if m.estado.value == 'Pendiente' %}
+                                <span class="px-2 py-1 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">⏳ Pendiente</span>
+                                {% elif m.estado.value == 'Aprobado' %}
+                                <span class="px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">✅ Aprobado</span>
+                                {% else %}
+                                <span class="px-2 py-1 rounded-full text-xs font-medium bg-red-100 text-red-800">❌ Rechazado</span>
+                                {% endif %}
+                            </td>
+                            <td class="px-4 py-3 text-gray-500 text-sm">{{ m.responsable_usuario.nombre_completo if m.responsable_usuario else '—' }}</td>
+                            <td class="px-4 py-3">
+                                {% if m.estado.value == 'Pendiente' and user.rol.value in ['Administrador', 'Encargado', 'Super Admin'] %}
+                                <form method="post" action="/mermas/{{ m.id }}/aprobar" class="inline-block mr-1">
+                                    <button class="px-2 py-1 text-xs bg-green-600 text-white rounded hover:bg-green-700" onclick="return confirm('¿Aprobar y descontar stock?')">✅ Aprobar</button>
+                                </form>
+                                <form method="post" action="/mermas/{{ m.id }}/rechazar" class="inline-block">
+                                    <button class="px-2 py-1 text-xs bg-red-600 text-white rounded hover:bg-red-700">❌ Rechazar</button>
+                                </form>
+                                {% else %}
+                                <span class="text-xs text-gray-400">—</span>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+        {% else %}
+        <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-8 text-center text-gray-400">
+            No hay mermas registradas. <a href="#" class="tab-btn text-primary-600" data-tab="nueva">Reportar la primera</a>
+        </div>
+        {% endif %}
+    </div>
+
+    {# ── Tab 3: Formulario Nueva Merma ─────────────────── #}
+    <div class="tab-panel hidden" id="panel-nueva">
+        <div class="max-w-2xl mx-auto bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+            <h2 class="text-xl font-bold text-gray-900 mb-4">⚠️ Reportar Nueva Merma</h2>
+            <form method="post" action="/mermas/nueva" class="space-y-4">
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Ingrediente *</label>
+                        <select name="ingrediente_id" required class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm">
+                            {% for i in ingredientes %}
+                            <option value="{{ i.id }}">{{ i.nombre }} ({{ i.unidad_medida.value }})</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Tipo *</label>
+                        <select name="tipo" required class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm">
+                            {% for t in tipos %}<option value="{{ t.value }}">{{ t.value }}</option>{% endfor %}
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Cantidad *</label>
+                        <input type="number" step="0.01" name="cantidad" required min="0.01" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm" placeholder="Ej: 2.5">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Fecha *</label>
+                        <input type="date" name="fecha_merma" value="{{ today }}" required class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm">
+                    </div>
+                    <div class="md:col-span-2">
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Observaciones</label>
+                        <textarea name="observaciones" rows="2" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm" placeholder="Detalles de la merma..."></textarea>
+                    </div>
+                </div>
+                <div class="flex items-center justify-between pt-4 border-t border-gray-200">
+                    <a href="#" class="tab-btn text-gray-500 hover:text-gray-700" data-tab="mermas">← Cancelar</a>
+                    <button type="submit" class="px-6 py-2 bg-red-600 text-white rounded-lg text-sm font-medium hover:bg-red-700">
+                        Reportar Merma
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<script>
+// Simple tab switching
+document.querySelectorAll('.tab-btn[data-tab]').forEach(btn => {
+    btn.addEventListener('click', () => {
+        const tab = btn.dataset.tab;
+        document.querySelectorAll('.tab-btn[data-tab]').forEach(b => {
+            b.classList.remove('text-primary-600', 'border-b-2', 'border-primary-600');
+            b.classList.add('text-gray-500');
+        });
+        btn.classList.remove('text-gray-500');
+        btn.classList.add('text-primary-600', 'border-b-2', 'border-primary-600');
+        document.querySelectorAll('.tab-panel').forEach(p => p.classList.add('hidden'));
+        document.getElementById('panel-' + tab).classList.remove('hidden');
+    });
+});
+
+// Auto-switch tab based on URL hash
+const hash = window.location.hash.slice(1);
+if (hash && document.querySelector(`[data-tab="${hash}"]`)) {
+    document.querySelector(`[data-tab="${hash}"]`).click();
+}
+</script>
+{% endblock %}

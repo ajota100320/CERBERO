@@ -1,0 +1,111 @@
+{% extends "base.html" %}
+
+{% block title %}Proveedores - ERP Gastronómico{% endblock %}
+
+{% block content %}
+<div class="space-y-6">
+    <div class="flex items-center justify-between">
+        <div>
+            <h1 class="text-2xl font-bold text-gray-900">Proveedores</h1>
+            <p class="text-gray-500 mt-1">Gestión de proveedores</p>
+        </div>
+        <a href="/proveedores/nuevo" class="bg-primary-600 text-white px-4 py-2 rounded-lg font-medium hover:bg-primary-700 transition-colors flex items-center space-x-2">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path>
+            </svg>
+            <span>Nuevo Proveedor</span>
+        </a>
+    </div>
+
+    <!-- Search and Filters -->
+    <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-4">
+        <form method="GET" class="flex flex-col sm:flex-row gap-4">
+            <div class="flex-1">
+                <label for="search" class="sr-only">Buscar</label>
+                <input type="text" name="search" id="search" value="{{ search }}" placeholder="Buscar proveedor..." class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500">
+            </div>
+            <button type="submit" class="bg-gray-100 text-gray-700 px-4 py-2 rounded-lg font-medium hover:bg-gray-200 transition-colors">Filtrar</button>
+        </form>
+    </div>
+
+    <!-- Table -->
+    <div class="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+        {% if proveedores %}
+        <div class="overflow-x-auto">
+            <table class="w-full">
+                <thead class="bg-gray-50">
+                    <tr>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Proveedor</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Contacto</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Teléfono</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Email</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Estado</th>
+                        <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Acciones</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-gray-200">
+                    {% for prov in proveedores %}
+                    <tr class="hover:bg-gray-50">
+                        <td class="px-6 py-4">
+                            <p class="font-medium text-gray-900">{{ prov.nombre }}</p>
+                            {% if prov.direccion %}
+                            <p class="text-sm text-gray-500">{{ prov.direccion[:50] }}{% if prov.direccion|length > 50 %}...{% endif %}</p>
+                            {% endif %}
+                        </td>
+                        <td class="px-6 py-4 text-gray-700">{{ prov.contacto or '-' }}</td>
+                        <td class="px-6 py-4 text-gray-700">{{ prov.telefono or '-' }}</td>
+                        <td class="px-6 py-4 text-gray-700">{{ prov.email or '-' }}</td>
+                        <td class="px-6 py-4">
+                            <span class="px-2 py-1 text-xs font-medium {% if prov.activo %}bg-green-50 text-green-700{% else %}bg-gray-50 text-gray-700{% endif %} rounded-full">
+                                {% if prov.activo %}Activo{% else %}Inactivo{% endif %}
+                            </span>
+                        </td>
+                        <td class="px-6 py-4 text-right space-x-2">
+                            <a href="/proveedores/{{ prov.id }}/editar" class="text-primary-600 hover:text-primary-700 text-sm font-medium">Editar</a>
+                            {% if not prov.compras %}
+                            <form method="POST" action="/proveedores/{{ prov.id }}/eliminar" class="inline" onsubmit="return confirm('¿Eliminar proveedor?')">
+                                <button type="submit" class="text-red-600 hover:text-red-700 text-sm font-medium">Eliminar</button>
+                            </form>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+
+        <!-- Pagination -->
+        {% if total_pages > 1 %}
+        <div class="px-6 py-4 border-t border-gray-200 flex items-center justify-between">
+            <p class="text-sm text-gray-700">Mostrando {{ (page - 1) * per_page + 1 }} a {{ [page * per_page, total] | min }} de {{ total }} proveedores</p>
+            <div class="flex space-x-2">
+                {% if page > 1 %}
+                <a href="?search={{ search }}&page={{ page - 1 }}" class="px-3 py-2 bg-white border border-gray-300 rounded-lg text-sm hover:bg-gray-50">Anterior</a>
+                {% endif %}
+                {% for p in range(max(1, page - 2), min(total_pages + 1, page + 3)) %}
+                <a href="?search={{ search }}&page={{ p }}" class="px-4 py-2 {% if p == page %}bg-primary-600 text-white{% else %}bg-white border border-gray-300{% endif %} rounded-lg text-sm">{{ p }}</a>
+                {% endfor %}
+                {% if page < total_pages %}
+                <a href="?search={{ search }}&page={{ page + 1 }}" class="px-3 py-2 bg-white border border-gray-300 rounded-lg text-sm hover:bg-gray-50">Siguiente</a>
+                {% endif %}
+            </div>
+        </div>
+        {% endif %}
+        {% else %}
+        <div class="px-6 py-12 text-center">
+            <svg class="w-16 h-16 mx-auto text-gray-300 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"></path>
+            </svg>
+            <h3 class="text-lg font-medium text-gray-900 mb-2">No hay proveedores</h3>
+            <p class="text-gray-500 mb-4">{% if search %}No se encontraron proveedores con ese criterio{% else %}Comienza agregando tu primer proveedor{% endif %}</p>
+            <a href="/proveedores/nuevo" class="inline-flex items-center px-4 py-2 bg-primary-600 text-white rounded-lg font-medium hover:bg-primary-700 transition-colors">
+                <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path>
+                </svg>
+                Agregar Proveedor
+            </a>
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

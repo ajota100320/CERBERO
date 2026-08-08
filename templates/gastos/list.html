@@ -1,0 +1,139 @@
+{% extends "base.html" %}
+
+{% block title %}Gastos - ERP Gastronómico{% endblock %}
+
+{% block content %}
+<div class="space-y-6">
+    <div class="flex items-center justify-between">
+        <div>
+            <h1 class="text-2xl font-bold text-gray-900">Control de Gastos</h1>
+            <p class="text-gray-500 mt-1">Registro y aprobación de gastos</p>
+        </div>
+        <a href="/gastos/nuevo" class="bg-primary-600 text-white px-4 py-2 rounded-lg font-medium hover:bg-primary-700 transition-colors flex items-center space-x-2">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path>
+            </svg>
+            <span>Nuevo Gasto</span>
+        </a>
+    </div>
+
+    <!-- Resumen del mes -->
+    <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-4">
+        <div class="flex items-center justify-between">
+            <div>
+                <p class="text-sm text-gray-500">Total Gastos del Mes</p>
+                <p class="text-2xl font-bold text-red-600">${{ "{:,.0f}".format(total_mes) }}</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Filters -->
+    <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-4">
+        <form method="GET" class="flex flex-col sm:flex-row gap-4">
+            <div>
+                <select name="tipo" class="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500">
+                    <option value="">Todos los tipos</option>
+                    {% for t in tipos %}
+                    <option value="{{ t.value }}" {% if t.value == tipo_filter %}selected{% endif %}>{{ t.value }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div>
+                <select name="estado" class="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500">
+                    <option value="">Todos los estados</option>
+                    {% for e in estados %}
+                    <option value="{{ e.value }}" {% if e.value == estado_filter %}selected{% endif %}>{{ e.value }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <button type="submit" class="bg-gray-100 text-gray-700 px-4 py-2 rounded-lg font-medium hover:bg-gray-200 transition-colors">Filtrar</button>
+        </form>
+    </div>
+
+    <!-- Table -->
+    <div class="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+        {% if gastos %}
+        <div class="overflow-x-auto">
+            <table class="w-full">
+                <thead class="bg-gray-50">
+                    <tr>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Fecha</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Tipo</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Descripción</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Proveedor</th>
+                        <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Monto</th>
+                        <th class="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">Estado</th>
+                        <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Acciones</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-gray-200">
+                    {% for gasto in gastos %}
+                    <tr class="hover:bg-gray-50">
+                        <td class="px-6 py-4 text-gray-700">{{ gasto.fecha_gasto.strftime('%d/%m/%Y') }}</td>
+                        <td class="px-6 py-4">
+                            <span class="px-2 py-1 text-xs font-medium bg-gray-100 text-gray-700 rounded-full">{{ gasto.tipo.value }}</span>
+                        </td>
+                        <td class="px-6 py-4">
+                            <p class="font-medium text-gray-900">{{ gasto.descripcion }}</p>
+                            {% if gasto.numero_comprobante %}
+                            <p class="text-xs text-gray-500">Comp: {{ gasto.numero_comprobante }}</p>
+                            {% endif %}
+                        </td>
+                        <td class="px-6 py-4 text-gray-700">{{ gasto.proveedor or '-' }}</td>
+                        <td class="px-6 py-4 text-right font-bold text-gray-900">${{ "{:,.0f}".format(gasto.monto) }}</td>
+                        <td class="px-6 py-4 text-center">
+                            <span class="px-3 py-1 text-xs font-medium {% if gasto.estado.value == 'APROBADO' %}bg-green-50 text-green-700{% elif gasto.estado.value == 'RECHAZADO' %}bg-red-50 text-red-700{% else %}bg-yellow-50 text-yellow-700{% endif %} rounded-full">{{ gasto.estado.value }}</span>
+                        </td>
+                        <td class="px-6 py-4 text-right space-x-2">
+                            {% if gasto.estado.value == 'PENDIENTE' %}
+                            <form method="POST" action="/gastos/{{ gasto.id }}/aprobar" class="inline" onsubmit="return confirm('¿Aprobar este gasto?')">
+                                <input type="hidden" name="aprobado_por" value="Usuario Actual">
+                                <button type="submit" class="text-green-600 hover:text-green-700 text-sm font-medium">Aprobar</button>
+                            </form>
+                            <form method="POST" action="/gastos/{{ gasto.id }}/rechazar" class="inline" onsubmit="return confirm('¿Rechazar este gasto?')">
+                                <input type="hidden" name="rechazado_por" value="Usuario Actual">
+                                <button type="submit" class="text-red-600 hover:text-red-700 text-sm font-medium">Rechazar</button>
+                            </form>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+
+        <!-- Pagination -->
+        {% if total_pages > 1 %}
+        <div class="px-6 py-4 border-t border-gray-200 flex items-center justify-between">
+            <p class="text-sm text-gray-700">Mostrando {{ (page - 1) * per_page + 1 }} a {{ [page * per_page, total] | min }} de {{ total }} gastos</p>
+            <div class="flex space-x-2">
+                {% if page > 1 %}
+                <a href="?tipo={{ tipo_filter }}&estado={{ estado_filter }}&page={{ page - 1 }}" class="px-3 py-2 bg-white border border-gray-300 rounded-lg text-sm hover:bg-gray-50">Anterior</a>
+                {% endif %}
+                {% for p in range(max(1, page - 2), min(total_pages + 1, page + 3)) %}
+                <a href="?tipo={{ tipo_filter }}&estado={{ estado_filter }}&page={{ p }}" class="px-4 py-2 {% if p == page %}bg-primary-600 text-white{% else %}bg-white border border-gray-300{% endif %} rounded-lg text-sm">{{ p }}</a>
+                {% endfor %}
+                {% if page < total_pages %}
+                <a href="?tipo={{ tipo_filter }}&estado={{ estado_filter }}&page={{ page + 1 }}" class="px-3 py-2 bg-white border border-gray-300 rounded-lg text-sm hover:bg-gray-50">Siguiente</a>
+                {% endif %}
+            </div>
+        </div>
+        {% endif %}
+        {% else %}
+        <div class="px-6 py-12 text-center">
+            <svg class="w-16 h-16 mx-auto text-gray-300 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9"></path>
+            </svg>
+            <h3 class="text-lg font-medium text-gray-900 mb-2">No hay gastos registrados</h3>
+            <p class="text-gray-500 mb-4">Registra tu primer gasto</p>
+            <a href="/gastos/nuevo" class="inline-flex items-center px-4 py-2 bg-primary-600 text-white rounded-lg font-medium hover:bg-primary-700 transition-colors">
+                <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path>
+                </svg>
+                Nuevo Gasto
+            </a>
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,34 @@
+# ──────────────────────────────────────────────
+# .gitignore — ERP Gastronómico
+# PROTEGE CREDENCIALES Y DATOS LOCALES
+# ──────────────────────────────────────────────
+
+# Credenciales (NUNCA subir a Git)
+.env
+
+# Bases de datos locales (datos sensibles + respaldos)
+*.db
+*.db.bak
+*.sqlite
+*.sqlite3
+
+# Respaldo de archivos de código (protocolo rollback)
+*.bak
+*.orig
+
+# Python
+__pycache__/
+*.py[cod]
+venv/
+.venv/
+*.egg-info/
+
+# Entorno virtual y paquetes
+*.whl
+
+# Alembic (mantener solo el código de migración, nunca datos)
+alembic/versions/__pycache__/
+
+# Sistema
+Thumbs.db
+.DS_Store

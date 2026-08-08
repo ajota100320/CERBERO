@@ -1,0 +1,41 @@
+{% extends "base.html" %}
+{% block title %}Reportar Incidencia · {{ empresa.nombre_comercial if empresa else 'ERP' }}{% endblock %}
+{% block content %}
+<div class="max-w-lg mx-auto px-4 py-8">
+    <h1 class="text-2xl font-bold text-gray-900 mb-2">⚠️ Reportar Incidencia</h1>
+    <p class="text-gray-500 text-sm mb-6">Describe el problema o falla detectada en la operación.</p>
+
+    {% if error %}
+    <div class="bg-red-50 border border-red-200 text-red-800 px-4 py-3 rounded-lg mb-6">{{ error }}</div>
+    {% endif %}
+
+    <form method="post" class="bg-white rounded-xl shadow-sm border border-gray-200 p-6 space-y-4">
+        <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">Tipo</label>
+            <select name="tipo" required class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm">
+                {% for t in tipos %}<option value="{{ t.value }}">{{ t.value }}</option>{% endfor %}
+            </select>
+        </div>
+        <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">Título</label>
+            <input type="text" name="titulo" required class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm" placeholder="Ej: Nevera 1 fuera de rango">
+        </div>
+        <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">Descripción</label>
+            <textarea name="descripcion" rows="3" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm" placeholder="Detalles del incidente..."></textarea>
+        </div>
+        <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">Severidad</label>
+            <select name="severidad" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm">
+                {% for s in severidades %}<option value="{{ s.value }}" {% if s.value == 'Media' %}selected{% endif %}>{{ s.value }}</option>{% endfor %}
+            </select>
+        </div>
+        <div class="flex items-center justify-between pt-2">
+            <a href="/operaciones" class="text-sm text-gray-500 hover:text-gray-700">← Cancelar</a>
+            <button type="submit" class="px-6 py-2 bg-red-600 text-white rounded-lg text-sm font-medium hover:bg-red-700">
+                Reportar Incidencia
+            </button>
+        </div>
+    </form>
+</div>
+{% endblock %}

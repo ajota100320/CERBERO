@@ -1,0 +1,115 @@
+{% extends "base.html" %}
+
+{% block title %}{{ page_title }} - {{ empresa.nombre_comercial if empresa else 'ERP Gastronómico' }}{% endblock %}
+
+{% block content %}
+<div class="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+    <div class="mb-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div>
+            <h1 class="text-2xl font-bold text-gray-900">{{ page_title }}</h1>
+            <p class="text-gray-500 mt-1">Configura plantillas predefinidas para agilizar los conteos físicos</p>
+        </div>
+        <button onclick="abrirModal()" class="px-4 py-2 rounded-lg text-sm font-medium bg-primary-600 text-white hover:bg-primary-700 transition-colors">
+            <svg class="w-4 h-4 inline mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+            Nueva Plantilla
+        </button>
+    </div>
+
+    {% if plantillas %}
+    <div class="bg-white rounded-lg border border-gray-200 overflow-hidden">
+        <table class="w-full">
+            <thead class="bg-gray-50 border-b border-gray-200">
+                <tr>
+                    <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Nombre</th>
+                    <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Descripción</th>
+                    <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Estado</th>
+                    <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Creada</th>
+                    <th class="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Acciones</th>
+                </tr>
+            </thead>
+            <tbody class="divide-y divide-gray-200">
+                {% for p in plantillas %}
+                <tr class="hover:bg-gray-50">
+                    <td class="px-4 py-3 whitespace-nowrap text-sm font-medium text-gray-900">{{ p.nombre }}</td>
+                    <td class="px-4 py-3 text-sm text-gray-700 max-w-xs truncate">{{ p.descripcion or '—' }}</td>
+                    <td class="px-4 py-3 whitespace-nowrap">
+                        <span class="inline-flex px-2 py-1 rounded-full text-xs font-medium {% if p.activo %}bg-green-100 text-green-700{% else %}bg-gray-100 text-gray-700{% endif %}">
+                            {% if p.activo %}Activa{% else %}Inactiva{% endif %}
+                        </span>
+                    </td>
+                    <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-700">{{ p.fecha_creacion.strftime('%d/%m/%Y %H:%M') }}</td>
+                    <td class="px-4 py-3 whitespace-nowrap text-right text-sm font-medium">
+                        <a href="/inventario-fisico/nuevo?plantilla_id={{ p.id }}" class="text-primary-600 hover:text-primary-900 mr-3">
+                            Usar
+                        </a>
+                        <button onclick="togglePlantilla({{ p.id }}, {{ p.activa|lower }})" class="text-gray-600 hover:text-gray-900">
+                            {% if p.activa %}Desactivar{% else %}Activar{% endif %}
+                        </button>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% else %}
+    <div class="bg-white rounded-lg border border-gray-200 p-8 text-center">
+        <svg class="mx-auto h-12 w-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/></svg>
+        <h3 class="mt-2 text-sm font-medium text-gray-900">No hay plantillas creadas</h3>
+        <p class="mt-1 text-sm text-gray-500">Crea tu primera plantilla para estandarizar los conteos</p>
+        <div class="mt-6">
+            <button onclick="abrirModal()" class="px-4 py-2 rounded-lg text-sm font-medium bg-primary-600 text-white hover:bg-primary-700 transition-colors">
+                Crear Plantilla
+            </button>
+        </div>
+    </div>
+    {% endif %}
+</div>
+
+{# Modal Nueva Plantilla #}
+<div id="modal-plantilla" class="fixed inset-0 bg-black bg-opacity-50 hidden items-center justify-center z-50 p-4">
+    <div class="bg-white rounded-lg shadow-xl max-w-md w-full">
+        <div class="p-6">
+            <h3 class="text-lg font-semibold text-gray-900 mb-4">Nueva Plantilla</h3>
+            <form action="/inventario-fisico/plantillas/crear" method="post" class="space-y-4">
+                <div>
+                    <label for="nombre" class="block text-sm font-medium text-gray-700 mb-1">Nombre <span class="text-red-500">*</span></label>
+                    <input type="text" name="nombre" id="nombre" required class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500" placeholder="Ej: Cierre de Cocina">
+                </div>
+                <div>
+                    <label for="descripcion" class="block text-sm font-medium text-gray-700 mb-1">Descripción</label>
+                    <textarea name="descripcion" id="descripcion" rows="3" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500" placeholder="Describe cuándo y cómo usar esta plantilla..."></textarea>
+                </div>
+                <div class="flex justify-end gap-3 pt-4 border-t border-gray-200">
+                    <button type="button" onclick="cerrarModal()" class="px-4 py-2 rounded-lg text-sm font-medium bg-gray-100 text-gray-700 hover:bg-gray-200 transition-colors">
+                        Cancelar
+                    </button>
+                    <button type="submit" class="px-4 py-2 rounded-lg text-sm font-medium bg-primary-600 text-white hover:bg-primary-700 transition-colors">
+                        Crear
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+{% block extra_scripts %}
+<script>
+    function abrirModal() {
+        document.getElementById('modal-plantilla').classList.remove('hidden');
+        document.getElementById('modal-plantilla').classList.add('flex');
+        document.getElementById('nombre').focus();
+    }
+    function cerrarModal() {
+        document.getElementById('modal-plantilla').classList.add('hidden');
+        document.getElementById('modal-plantilla').classList.remove('flex');
+    }
+    function togglePlantilla(id, activa) {
+        // TODO: implementar toggle via fetch
+        alert('Funcionalidad pendiente: toggle estado plantilla ID ' + id);
+    }
+    // Cerrar modal al hacer click fuera
+    document.getElementById('modal-plantilla').addEventListener('click', function(e) {
+        if (e.target === this) cerrarModal();
+    });
+</script>
+{% endblock %}

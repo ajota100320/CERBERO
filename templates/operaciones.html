@@ -1,0 +1,140 @@
+{% extends "base.html" %}
+{% block title %}Operaciones · {{ empresa.nombre_comercial if empresa else 'ERP' }}{% endblock %}
+{% block content %}
+<div class="max-w-6xl mx-auto px-4 py-8">
+    <div class="flex items-center justify-between mb-6">
+        <div>
+            <h1 class="text-2xl font-bold text-gray-900">🔧 Panel de Operaciones</h1>
+            <p class="text-gray-500 text-sm">Incidencias activas y ejecución de checklists.</p>
+        </div>
+        <a href="/incidencias/nueva" class="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg text-sm font-medium transition-colors">
+            ⚠️ Reportar Incidencia
+        </a>
+    </div>
+
+    {% if request.query_params.get('ok') == '1' %}
+    <div class="bg-green-50 border border-green-200 text-green-800 px-4 py-3 rounded-lg mb-6">✅ Operación registrada.</div>
+    {% endif %}
+
+    {# ── Incidencias activas ───────────────────────────── #}
+    <div class="bg-white rounded-xl shadow-sm border border-gray-200 mb-8">
+        <div class="px-6 py-4 border-b border-gray-200">
+            <h2 class="text-lg font-semibold text-gray-900">Incidencias Activas</h2>
+        </div>
+        {% if incidencias %}
+        <div class="overflow-x-auto">
+            <table class="w-full text-sm">
+                <thead class="bg-gray-50">
+                    <tr>
+                        <th class="px-4 py-3 text-left font-medium text-gray-500">Tipo</th>
+                        <th class="px-4 py-3 text-left font-medium text-gray-500">Título</th>
+                        <th class="px-4 py-3 text-left font-medium text-gray-500">Severidad</th>
+                        <th class="px-4 py-3 text-left font-medium text-gray-500">Estado</th>
+                        <th class="px-4 py-3 text-left font-medium text-gray-500">Reportado</th>
+                        {% if user.rol.value in ['Administrador', 'Encargado', 'Super Admin'] %}
+                        <th class="px-4 py-3 text-left font-medium text-gray-500">Acción</th>
+                        {% endif %}
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-gray-100">
+                    {% for inc in incidencias %}
+                    <tr class="hover:bg-gray-50">
+                        <td class="px-4 py-3">
+                            <span class="px-2 py-0.5 rounded text-xs font-medium
+                                {% if inc.tipo.value == 'Equipo' %}bg-yellow-100 text-yellow-800
+                                {% elif inc.tipo.value == 'Higiene' %}bg-green-100 text-green-800
+                                {% elif inc.tipo.value == 'Temperatura' %}bg-blue-100 text-blue-800
+                                {% elif inc.tipo.value == 'Seguridad' %}bg-red-100 text-red-800
+                                {% else %}bg-gray-100 text-gray-700{% endif %}">
+                                {{ inc.tipo.value }}
+                            </span>
+                        </td>
+                        <td class="px-4 py-3 text-gray-900">{{ inc.titulo }}</td>
+                        <td class="px-4 py-3">
+                            <span class="px-2 py-0.5 rounded text-xs font-medium
+                                {% if inc.severidad.value == 'Crítica' %}bg-red-100 text-red-800
+                                {% elif inc.severidad.value == 'Alta' %}bg-orange-100 text-orange-800
+                                {% elif inc.severidad.value == 'Media' %}bg-yellow-100 text-yellow-800
+                                {% else %}bg-green-100 text-green-800{% endif %}">
+                                {{ inc.severidad.value }}
+                            </span>
+                        </td>
+                        <td class="px-4 py-3">
+                            <span class="px-2 py-0.5 rounded text-xs font-medium
+                                {% if inc.estado.value == 'Abierta' %}bg-red-50 text-red-700
+                                {% else %}bg-blue-50 text-blue-700{% endif %}">
+                                {{ inc.estado.value }}
+                            </span>
+                        </td>
+                        <td class="px-4 py-3 text-gray-500 text-xs">{{ inc.fecha_reporte.strftime('%d/%m %H:%M') if inc.fecha_reporte else '-' }}</td>
+                        {% if user.rol.value in ['Administrador', 'Encargado', 'Super Admin'] %}
+                        <td class="px-4 py-3">
+                            <form method="post" action="/incidencias/{{ inc.id }}/estado" class="inline-flex gap-1">
+                                {% if inc.estado.value == 'Abierta' %}
+                                <input type="hidden" name="nuevo_estado" value="En Revisión">
+                                <button class="text-xs px-2 py-1 bg-blue-50 text-blue-700 rounded hover:bg-blue-100">Revisar</button>
+                                {% elif inc.estado.value == 'En Revisión' %}
+                                <input type="hidden" name="nuevo_estado" value="Resuelta">
+                                <button class="text-xs px-2 py-1 bg-green-50 text-green-700 rounded hover:bg-green-100">Resolver</button>
+                                <input type="hidden" name="nuevo_estado" value="Cerrada" form="cerrar{{ inc.id }}">
+                                {% endif %}
+                            </form>
+                            {% if inc.estado.value == 'En Revisión' %}
+                            <form method="post" action="/incidencias/{{ inc.id }}/estado" id="cerrar{{ inc.id }}" class="inline">
+                                <button class="text-xs px-2 py-1 bg-gray-50 text-gray-600 rounded hover:bg-gray-100">Cerrar</button>
+                            </form>
+                            {% endif %}
+                        </td>
+                        {% endif %}
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <div class="px-6 py-8 text-center text-gray-400">✨ No hay incidencias activas.</div>
+        {% endif %}
+    </div>
+
+    {# ── Checklists recientes ─────────────────────────── #}
+    <div class="bg-white rounded-xl shadow-sm border border-gray-200">
+        <div class="px-6 py-4 border-b border-gray-200">
+            <h2 class="text-lg font-semibold text-gray-900">Checklists Recientes</h2>
+        </div>
+        {% if checklists %}
+        <div class="overflow-x-auto">
+            <table class="w-full text-sm">
+                <thead class="bg-gray-50">
+                    <tr>
+                        <th class="px-4 py-3 text-left font-medium text-gray-500">Tipo</th>
+                        <th class="px-4 py-3 text-left font-medium text-gray-500">Fecha</th>
+                        <th class="px-4 py-3 text-left font-medium text-gray-500">Responsable</th>
+                        <th class="px-4 py-3 text-left font-medium text-gray-500">Acción</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-gray-100">
+                    {% for cl in checklists %}
+                    <tr class="hover:bg-gray-50">
+                        <td class="px-4 py-3">
+                            <span class="px-2 py-0.5 rounded text-xs font-medium {{ 'bg-green-100 text-green-800' if cl.tipo.value == 'Apertura' else 'bg-blue-100 text-blue-800' }}">
+                                {{ cl.tipo.value }}
+                            </span>
+                        </td>
+                        <td class="px-4 py-3 text-gray-900">{{ cl.fecha.strftime('%d/%m/%Y') if cl.fecha else '-' }}</td>
+                        <td class="px-4 py-3 text-gray-500">{{ cl.responsable_usuario.nombre_completo if cl.responsable_usuario else (cl.responsable or '-') }}</td>
+                        <td class="px-4 py-3">
+                            <a href="/checklist/{{ cl.id }}/ejecutar" class="text-xs px-3 py-1 bg-primary-50 text-primary-700 rounded-lg hover:bg-primary-100">
+                                Ejecutar →
+                            </a>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <div class="px-6 py-8 text-center text-gray-400">No hay checklists registrados aún.</div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}
