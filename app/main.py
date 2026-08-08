@@ -2611,7 +2611,7 @@ async def branding_update(
 
 # ── SUCURSALES ADMINISTRACIÓN ──
 @app.get("/configuracion/sucursales", response_class=HTMLResponse)
-as configuracion_sucursales(request: Request, db: Session = Depends(get_db), user: Usuario = Depends(get_current_user)):
+async def configuracion_sucursales(request: Request, db: Session = Depends(get_db), user: Usuario = Depends(get_current_user)):
     if not user or user.rol not in [RolUsuario.ADMINISTRADOR, RolUsuario.SUPER_ADMIN]:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="No autorizado")
     # Obtener sucursales activas (filtrado por tenant ya aplicado)
@@ -2619,7 +2619,7 @@ as configuracion_sucursales(request: Request, db: Session = Depends(get_db), use
     return templates.TemplateResponse("sucursales_admin.html", {"request": request, "user": user, "sucursales": sucursales})
 
 @app.post("/configuracion/sucursales/{sucursal_id}/editar", response_class=RedirectResponse)
-as editar_sucursal(sucursal_id: int, nombre: str = Form(...), request: Request, db: Session = Depends(get_db), user: Usuario = Depends(get_current_user)):
+async def editar_sucursal(sucursal_id: int, request: Request, db: Session = Depends(get_db), user: Usuario = Depends(get_current_user), nombre: str = Form(...)):
     if not user or user.rol not in [RolUsuario.ADMINISTRADOR, RolUsuario.SUPER_ADMIN]:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="No autorizado")
     sucursal = db.query(Sucursal).filter(Sucursal.id == sucursal_id).first()
