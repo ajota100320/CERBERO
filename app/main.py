@@ -113,16 +113,22 @@ async def _tenant_context_middleware(request: Request, call_next):
 # Inicializar BD al arrancar
 @app.on_event("startup")
 def startup_event():
-    init_db()
-    db = SessionLocal()
-    seed_initial_data(db)
-    db.close()
-
-
-# ──────────────────────────────────────────────
-# AUTENTICACIÓN Y AUTORIZACIÓN
-# ──────────────────────────────────────────────
-
+    try:
+        init_db()
+        db = SessionLocal()
+        seed_initial_data(db)
+        db.close()
+    
+    
+    # ──────────────────────────────────────────────
+    # AUTENTICACIÓN Y AUTORIZACIÓN
+    # ──────────────────────────────────────────────
+    
+    except Exception as e:
+        import logging
+        logging.error(f"Failed to initialize application: {e}")
+        # Re-raise to prevent the app from starting in a broken state
+        raise
 def verify_password(plain_password: str, hashed_password: str) -> bool:
     return bcrypt.checkpw(plain_password.encode('utf-8'), hashed_password.encode('utf-8'))
 
