@@ -87,8 +87,6 @@ python-jose==3.5.0
 python-multipart==0.0.32
 python-telegram-bot==22.6
 pytz==2025.2
-pywin32==311
-pywinpty==2.0.15
 PyYAML==6.0.3
 referencing==0.37.0
 requests==2.33.0
