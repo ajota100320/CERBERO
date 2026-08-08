@@ -331,21 +331,33 @@ def get_current_time():
     return datetime.now().time()
 
 def calculate_dashboard_stats(db: Session, sucursal_id: int = None) -> dict:
+    # FILTRO MULTI-TENANT: obtener tenant_id del contexto
+    from app.tenant import tenant_context
+    tenant_id = tenant_context.get()
+
     # Subconsulta de IDs de usuarios de la sucursal (los registros operativos
     # se vinculan a sucursal vía el usuario responsable/creador)
     usuarios_subq = None
     if sucursal_id:
         usuarios_subq = db.query(Usuario.id).filter(Usuario.sucursal_id == sucursal_id).scalar_subquery()
 
+    def apply_tenant_filter(query, model_class):
+        """Aplica filtro de tenant si hay contexto activo"""
+        if tenant_id is not None and hasattr(model_class, 'empresa_id'):
+            return query.filter(model_class.empresa_id == tenant_id)
+        return query
+
     # Stock crítico: tabla maestra única (consolidado global, no tiene sucursal)
-    stock_critico = db.query(IngredienteStock).filter(
+    stock_critico_q = db.query(IngredienteStock).filter(
         IngredienteStock.activo == True,
         IngredienteStock.stock_actual <= IngredienteStock.stock_minimo
-    ).count()
+    )
+    stock_critico = apply_tenant_filter(stock_critico_q, IngredienteStock).count()
 
     compras_q = db.query(RegistroCompra).filter(
         RegistroCompra.estado == EstadoAprobacion.PENDIENTE
     )
+    compras_q = apply_tenant_filter(compras_q, RegistroCompra)
     if usuarios_subq is not None:
         compras_q = compras_q.filter(RegistroCompra.creado_por_usuario_id.in_(usuarios_subq))
     compras_pendientes = compras_q.count()
@@ -353,6 +365,7 @@ def calculate_dashboard_stats(db: Session, sucursal_id: int = None) -> dict:
     mermas_q = db.query(RegistroMerma).filter(
         RegistroMerma.estado == EstadoAprobacion.PENDIENTE
     )
+    mermas_q = apply_tenant_filter(mermas_q, RegistroMerma)
     if usuarios_subq is not None:
         mermas_q = mermas_q.filter(RegistroMerma.responsable_usuario_id.in_(usuarios_subq))
     mermas_pendientes = mermas_q.count()
@@ -360,6 +373,7 @@ def calculate_dashboard_stats(db: Session, sucursal_id: int = None) -> dict:
     gastos_q = db.query(ControlGasto).filter(
         ControlGasto.estado == EstadoAprobacion.PENDIENTE
     )
+    gastos_q = apply_tenant_filter(gastos_q, ControlGasto)
     if usuarios_subq is not None:
         gastos_q = gastos_q.filter(ControlGasto.responsable_usuario_id.in_(usuarios_subq))
     gastos_pendientes = gastos_q.count()
@@ -368,27 +382,33 @@ def calculate_dashboard_stats(db: Session, sucursal_id: int = None) -> dict:
     checklist_q = db.query(ListaVerificacionDiario).filter(
         ListaVerificacionDiario.fecha == hoy
     )
+    checklist_q = apply_tenant_filter(checklist_q, ListaVerificacionDiario)
     if usuarios_subq is not None:
         checklist_q = checklist_q.filter(ListaVerificacionDiario.responsable_usuario_id.in_(usuarios_subq))
     checklist_hoy = checklist_q.count()
 
-    temp_fuera_rango = db.query(RegistroTemperatura).filter(
+    temp_fuera_rango_q = db.query(RegistroTemperatura).filter(
         RegistroTemperatura.fecha_medicion == hoy,
         RegistroTemperatura.dentro_rango == False
-    ).count()
+    )
+    temp_fuera_rango_q = apply_tenant_filter(temp_fuera_rango_q, RegistroTemperatura)
+    temp_fuera_rango = temp_fuera_rango_q.count()
 
-    valor_inventario = db.query(func.sum(IngredienteStock.stock_actual * IngredienteStock.costo_promedio)).filter(
+    valor_inventario_q = db.query(func.sum(IngredienteStock.stock_actual * IngredienteStock.costo_promedio)).filter(
         IngredienteStock.activo == True
-    ).scalar() or 0
+    )
+    valor_inventario_q = apply_tenant_filter(valor_inventario_q, IngredienteStock)
+    valor_inventario = valor_inventario_q.scalar() or 0
 
     inicio_mes = date.today().replace(day=1)
     gastos_mes_q = db.query(func.sum(ControlGasto.monto)).filter(
         ControlGasto.fecha_gasto >= inicio_mes
     )
+    gastos_mes_q = apply_tenant_filter(gastos_mes_q, ControlGasto)
     if usuarios_subq is not None:
         gastos_mes_q = gastos_mes_q.filter(ControlGasto.responsable_usuario_id.in_(usuarios_subq))
     gastos_mes = gastos_mes_q.scalar() or 0
-    
+
     return {
         "stock_critico": stock_critico,
         "compras_pendientes": compras_pendientes,
@@ -450,20 +470,31 @@ async def login_post(
     
     # Redirigir a dashboard con cookie httponly (solo el JWT, sin prefijo Bearer para evitar problemas de encoding de cookie)
     response = RedirectResponse(url="/", status_code=status.HTTP_303_SEE_OTHER)
+    # Configuración de cookie compatible con móvil (iOS/Safari, Android/Chrome)
+    # En producción (HTTPS): secure=True, samesite="none" para cross-site mobile
+    # En desarrollo (HTTP): secure=False, samesite="lax"
+    is_production = os.getenv("ENVIRONMENT", "development").lower() == "production"
     response.set_cookie(
         key="access_token",
         value=token,
         httponly=True,
-        secure=False,  # True en producción con HTTPS
-        samesite="lax",
-        max_age=expire_minutes * 60
+        secure=is_production,           # True solo en HTTPS (producción)
+        samesite="none" if is_production else "lax",  # "none" requiere secure=True
+        max_age=expire_minutes * 60,
+        path="/",                       # Disponible en toda la app
     )
     return response
 
 @app.get("/logout")
-async def logout():
+async def logout(request: Request):
+    is_production = os.getenv("ENVIRONMENT", "development").lower() == "production"
     response = RedirectResponse(url="/login", status_code=303)
-    response.delete_cookie("access_token")
+    response.delete_cookie(
+        key="access_token",
+        path="/",
+        secure=is_production,
+        samesite="none" if is_production else "lax",
+    )
     return response
 
 
@@ -528,22 +559,25 @@ async def cambiar_password_post(
 
     # 4. Regenerar sesión: nuevo JWT (la cookie vieja queda invalidada por reemplazo)
     token = create_access_token(
-        data={
-            "sub": str(user.id),
-            "email": user.email,
-            "rol": user.rol.value,
-            "empresa_id": user.empresa_id,
-        },
-        expires_delta=timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
-    )
+            data={
+                "sub": str(user.id),
+                "email": user.email,
+                "rol": user.rol.value,
+                "empresa_id": user.empresa_id,
+            },
+            expires_delta=timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
+        )
     response = RedirectResponse(url="/", status_code=status.HTTP_303_SEE_OTHER)
+    # Configuración de cookie compatible con móvil (iOS/Safari, Android/Chrome)
+    is_production = os.getenv("ENVIRONMENT", "development").lower() == "production"
     response.set_cookie(
         key="access_token",
         value=token,
         httponly=True,
-        secure=False,  # True en producción con HTTPS
-        samesite="lax",
-        max_age=ACCESS_TOKEN_EXPIRE_MINUTES * 60
+        secure=is_production,           # True solo en HTTPS (producción)
+        samesite="none" if is_production else "lax",  # "none" requiere secure=True
+        max_age=ACCESS_TOKEN_EXPIRE_MINUTES * 60,
+        path="/",                       # Disponible en toda la app
     )
     return response
 
@@ -723,14 +757,23 @@ async def dashboard(request: Request, db: Session = Depends(get_db), user: Usuar
         ultimas_mermas_q = ultimas_mermas_q.filter(RegistroMerma.responsable_usuario_id.in_(usuarios_subq))
     ultimas_mermas = ultimas_mermas_q.order_by(desc(RegistroMerma.fecha_registro)).limit(5).all()
 
-    ingredientes_criticos = db.query(IngredienteStock).filter(
+    # FILTRO MULTI-TENANT: ingredientes críticos
+    tenant_id = tenant_context.get()
+    ingredientes_criticos_q = db.query(IngredienteStock).filter(
         IngredienteStock.activo == True,
         IngredienteStock.stock_actual <= IngredienteStock.stock_minimo
-    ).order_by(IngredienteStock.stock_actual.asc()).limit(10).all()
+    )
+    if tenant_id is not None:
+        ingredientes_criticos_q = ingredientes_criticos_q.filter(IngredienteStock.empresa_id == tenant_id)
+    ingredientes_criticos = ingredientes_criticos_q.order_by(IngredienteStock.stock_actual.asc()).limit(10).all()
 
-    temps_recientes = db.query(RegistroTemperatura).order_by(
+    # FILTRO MULTI-TENANT: temperaturas recientes
+    temps_recientes_q = db.query(RegistroTemperatura).order_by(
         desc(RegistroTemperatura.fecha_registro)
-    ).limit(10).all()
+    )
+    if tenant_id is not None:
+        temps_recientes_q = temps_recientes_q.filter(RegistroTemperatura.empresa_id == tenant_id)
+    temps_recientes = temps_recientes_q.limit(10).all()
 
     # Notificaciones no leídas del usuario
     notificaciones = db.query(Notificacion).filter(
