@@ -187,4 +187,22 @@ La transformación se completó **sin pérdida de datos** (Zero Data Loss) y con
   - Commit: `ec0a3a1` - "Fix masivo: UI unificada por fuerza bruta y Dashboard blindado con try-except"
   - Push: `origin/main` actualizado (de `d3c6a63` a `ec0a3a1`)
 
+
+---
+
+## 7.7 Corrección crítica de redirecciones 303 y limpieza manual de UI (agosto de 2026)
+
+### 7.7.1 Reparación del Exception Handler para respetar redirecciones 3xx
+- Se modificó el `custom_http_exception_handler` en `app/main.py` para que redirecciones HTTP (300-399) se ejecuten normalmente, evitando que se devuelvan como JSON y causen pantallas negras.
+- El handler ahora verifica si el código de estado está entre 300 y 399, y si es así, ejecuta la redirección usando la cabecera `Location` o el raíz como fallback.
+
+### 7.7.2 Limpieza manual de UI para eliminar el efecto Frankenstein
+- Se eliminaron manualmente las barras de navegación hardcodeadas (`<nav>...</nav>`) y cabeceras (`<header>...</header>`) de las plantillas hijas (como `cambiar_password.html` y `login.html`), dejando que la navegación se herede exclusivamente de `base.html`.
+- Se aseguró que cada plantilla comience con `{% extends "base.html" %}` y que el contenido esté envuelto en `{% block content %} ... {% endblock %}`.
+- Se reemplazaron todas las menciones restantes de "Templo del Smash" por "GastroFlow".
+
+- **Registro de Git:**
+  - Commit: `2cfee1c` - "Fix crítico: Reparar redirecciones 303 y limpieza manual de UI"
+  - Push: `origin/main` actualizado (de `ec0a3a1` a `2cfee1c`)
+
 *Documento generado para seguimiento ejecutivo. Detalle técnico completo en CORE_ARCHITECTURE.md.*
