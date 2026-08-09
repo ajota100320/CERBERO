@@ -111,14 +111,12 @@
 {% if sucursales is defined %}
     <div class="flex items-center space-x-4">
         <label for="sucursal-select" class="hidden sm:block text-sm font-medium text-gray-700">Sucursal:</label>
-        <select id="sucursal-select" name="sucursal_id" class="border border-gray-300 rounded-md shadow-sm px-2 py-1 bg-white text-sm"
+        <select id="sucursal-select" name="sucursal_id" class="whitespace-nowrap w-48 border border-gray-300 rounded-md shadow-sm px-2 py-1 bg-white text-sm"
                 onchange="if(this.value) window.location.href = window.location.pathname + '?sucursal_id=' + this.value;">
             <option value="">Todas las sucursales</option>
-            <optgroup label="{{ empresa.nombre_comercial or empresa.nombre }}">
                 {% for s in sucursales %}
                 <option value="{{ s.id }}" {% if sucursal_id|string == s.id|string %}selected{% endif %}>{{ s.nombre }}</option>
                 {% endfor %}
-            </optgroup>
         </select>
     </div>
 {% endif %}
@@ -232,14 +230,12 @@
 {% if sucursales is defined %}
     <div class="px-2 pt-2 pb-3 space-y-1">
         <label for="sucursal-select-mobile" class="block text-sm font-medium text-gray-700">Sucursal:</label>
-        <select id="sucursal-select-mobile" name="sucursal_id" class="block w-full border border-gray-300 rounded-md shadow-sm px-3 py-2 bg-white text-sm"
+        <select id="sucursal-select-mobile" name="sucursal_id" class="whitespace-nowrap w-48 block w-full border border-gray-300 rounded-md shadow-sm px-3 py-2 bg-white text-sm"
                 onchange="if(this.value) window.location.href = window.location.pathname + '?sucursal_id=' + this.value;">
             <option value="">Todas las sucursales</option>
-            <optgroup label="{{ empresa.nombre_comercial or empresa.nombre }}">
                 {% for s in sucursales %}
                 <option value="{{ s.id }}" {% if sucursal_id|string == s.id|string %}selected{% endif %}>{{ s.nombre }}</option>
                 {% endfor %}
-            </optgroup>
         </select>
     </div>
 {% endif %}
