@@ -17,14 +17,7 @@
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"></path>
             </svg>
             <label for="sucursal-select" class="text-sm font-medium text-gray-700 whitespace-nowrap">Sucursal:</label>
-            <select id="sucursal-select" name="sucursal_id"
-                    onchange="if(this.value){window.location.href='/?sucursal_id='+this.value}else{window.location.href='/'}"
-                    class="text-sm border border-gray-300 rounded-lg px-2 py-1.5 focus:ring-2 focus:ring-primary-500 focus:border-primary-500 bg-white">
-                <option value="">🌍 Todas (Consolidado Global)</option>
-                {% for s in sucursales %}
-                <option value="{{ s.id }}" {% if sucursal_seleccionada == s.id %}selected{% endif %}>{{ s.nombre }}</option>
-                {% endfor %}
-            </select>
+            
         </div>
         {% endif %}
     </div>
