@@ -119,10 +119,16 @@ async def _tenant_context_middleware(request: Request, call_next):
 # ──────────────────────────────────────────────
 @app.exception_handler(StarletteHTTPException)
 async def custom_http_exception_handler(request, exc):
-    # Si el error es 401 (No Autenticado) y es una peticion web (GET), redirigir al login
+    # Si es una redireccion (ej. 303 See Other), respetarla y ejecutarla
+    if 300 <= exc.status_code < 400:
+        location = exc.headers.get("Location") if exc.headers else "/"
+        return RedirectResponse(url=location, status_code=exc.status_code)
+    
+    # Si es 401 y es una peticion web (GET), ir al login
     if exc.status_code == 401 and request.method == "GET":
         return RedirectResponse(url="/login", status_code=303)
-    # Para peticiones API (POST/PUT/DELETE) o cualquier otro error, mantener JSON
+        
+    # Para los demas errores, devolver JSON
     return JSONResponse({"detail": exc.detail}, status_code=exc.status_code)
 
 # ──────────────────────────────────────────────

@@ -168,4 +168,23 @@ La transformación se completó **sin pérdida de datos** (Zero Data Loss) y con
   - Commit: `8fedb98` - "UI: Rebranding a GastroFlow, tablas responsivas y script de purga"
   - Push: `origin/main` actualizado (de `237994b` a `8fedb98`)
 
+
+---
+
+## 7.6 UI/UX Overhaul masivo y Dashboard blindado (agosto de 2026)
+
+### 7.6.1 Unificación forzada de la interfaz (Efecto Frankenstein)
+- Se reemplazó todo el texto hardcodeado "Templo del Smash" por "GastroFlow" en todas las plantillas HTML.
+- Se eliminaron todas las etiquetas <nav>...</nav> dentro de los archivos hijos (como inventario/list.html o proveedores/list.html), dejando que la navegación se herede exclusivamente de base.html.
+- Se aseguró que el <select> de sucursales en base.html tenga estilos Tailwind adecuados (bg-gray-800 text-white border border-gray-600 rounded px-2 py-1) para evitar choques con el logo.
+
+### 7.6.2 Blindaje del Dashboard contra Error 500 por datos vacíos
+- Se envolvió toda la lógica de cálculo de métricas (stock valorizado, gastos, etc.) en la función del dashboard (@app.get("/")) en un bloque try...except Exception as e:
+- En el except, se registra el error de cálculo y se inyectan valores por defecto (cero o listas vacías) para todas las variables utilizadas en la plantilla, garantizando que el Dashboard cargue incluso si la base de datos está purgada y vacía.
+- Se verificó que la aplicación arranca sin errores de sintaxis y que FastAPI puede cargar el módulo principal.
+
+- **Registro de Git:**
+  - Commit: `ec0a3a1` - "Fix masivo: UI unificada por fuerza bruta y Dashboard blindado con try-except"
+  - Push: `origin/main` actualizado (de `d3c6a63` a `ec0a3a1`)
+
 *Documento generado para seguimiento ejecutivo. Detalle técnico completo en CORE_ARCHITECTURE.md.*
