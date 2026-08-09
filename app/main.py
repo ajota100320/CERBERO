@@ -887,7 +887,7 @@ async def dashboard(request: Request, db: Session = Depends(get_db), user: Usuar
 
 @app.get("/proveedores", response_class=HTMLResponse)
 async def list_proveedores(request: Request, db: Session = Depends(get_db),
-                           search: str = "", page: int = 1, per_page: int = 20):
+                           search: str = "", sucursal_id: int = None, page: int = 1, per_page: int = 20):
     query = db.query(Proveedor)
     if search:
         query = query.filter(Proveedor.nombre.ilike(f"%{search}%"))
@@ -903,6 +903,7 @@ async def list_proveedores(request: Request, db: Session = Depends(get_db),
         "per_page": per_page,
         "total": total,
         "total_pages": (total + per_page - 1) // per_page,
+        "sucursal_id": sucursal_id,
     })
 
 @app.get("/proveedores/nuevo", response_class=HTMLResponse)
@@ -1480,13 +1481,16 @@ async def inventario_mermas(
 
 @app.get("/mermas", response_class=HTMLResponse)
 async def list_mermas(request: Request, db: Session = Depends(get_db),
-                      tipo: str = "", estado: str = "", page: int = 1, per_page: int = 20):
+                      tipo: str = "", estado: str = "", sucursal_id: int = None, page: int = 1, per_page: int = 20):
     query = db.query(RegistroMerma).options(joinedload(RegistroMerma.ingrediente))
     
     if tipo:
         query = query.filter(RegistroMerma.tipo == TipoMerma(tipo))
     if estado:
         query = query.filter(RegistroMerma.estado == EstadoAprobacion(estado))
+    # Filtro por sucursal (el registro de merma tiene sucursal_id directo)
+    if sucursal_id:
+        query = query.filter(RegistroMerma.sucursal_id == sucursal_id)
     
     total = query.count()
     mermas = query.order_by(desc(RegistroMerma.fecha_registro)).offset((page - 1) * per_page).limit(per_page).all()
@@ -1502,6 +1506,7 @@ async def list_mermas(request: Request, db: Session = Depends(get_db),
         "per_page": per_page,
         "total": total,
         "total_pages": (total + per_page - 1) // per_page,
+        "sucursal_id": sucursal_id,
     })
 
 
@@ -1936,7 +1941,7 @@ async def update_checklist(
 
 @app.get("/inventario", response_class=HTMLResponse)
 async def list_inventario(request: Request, db: Session = Depends(get_db),
-                          search: str = "", categoria: str = "", page: int = 1, per_page: int = 20):
+                          search: str = "", categoria: str = "", sucursal_id: int = None, page: int = 1, per_page: int = 20):
     query = db.query(IngredienteStock)
     if search:
         query = query.filter(IngredienteStock.nombre.ilike(f"%{search}%"))
@@ -1945,6 +1950,14 @@ async def list_inventario(request: Request, db: Session = Depends(get_db),
             query = query.filter(IngredienteStock.categoria == CategoriaIngrediente(categoria))
         except ValueError:
             pass  # categoria invalida, ignorar filtro
+    # Filtro por sucursal (via StockSucursal) - solo si sucursal_id viene en query params
+    if sucursal_id:
+        # Subquery para obtener ingredientes que tienen stock en esa sucursal
+        subq = db.query(StockSucursal.ingrediente_id).filter(
+            StockSucursal.sucursal_id == sucursal_id,
+            StockSucursal.empresa_id == tenant_context.get()
+        ).subquery()
+        query = query.filter(IngredienteStock.id.in_(subq))
 
     total = query.count()
     ingredientes = query.order_by(IngredienteStock.nombre).offset((page - 1) * per_page).limit(per_page).all()
@@ -1971,6 +1984,7 @@ async def list_inventario(request: Request, db: Session = Depends(get_db),
         "total_pages": (total + per_page - 1) // per_page,
         "valor_total": round(valor_total, 2),
         "criticos": criticos,
+        "sucursal_id": sucursal_id,
     })
 
 
@@ -2031,6 +2045,98 @@ async def edit_ingrediente_form(request: Request, ingrediente_id: int, db: Sessi
         "action": f"/inventario/{ingrediente_id}/editar",
         "title": "Editar Ingrediente",
     })
+
+
+
+@app.get("/inventario/{ingrediente_id}/ajustar", response_class=HTMLResponse)
+async def ajustar_stock_form(request: Request, ingrediente_id: int, db: Session = Depends(get_db), user: Usuario = Depends(require_auth)):
+    """Formulario para ajustar stock de un ingrediente (entrada/salida manual)"""
+    ing = db.query(IngredienteStock).filter(IngredienteStock.id == ingrediente_id).first()
+    if not ing:
+        raise HTTPException(status_code=404, detail="Ingrediente no encontrado")
+    
+    # Obtener sucursales de la empresa para selector
+    sucursales = db.query(Sucursal).filter(Sucursal.empresa_id == user.empresa_id, Sucursal.activa == True).all()
+    
+    return templates.TemplateResponse(request=request, name="inventario/ajustar.html", context={
+        "request": request,
+        "ingrediente": ing,
+        "sucursales": sucursales,
+        "user": user,
+    })
+
+@app.post("/inventario/{ingrediente_id}/ajustar")
+async def ajustar_stock_post(
+    ingrediente_id: int,
+    request: Request,
+    db: Session = Depends(get_db),
+    user: Usuario = Depends(require_auth),
+    tipo: str = Form(...),  # "entrada" o "salida"
+    cantidad: float = Form(...),
+    sucursal_id: int = Form(None),
+    observaciones: str = Form(""),
+):
+    """Procesa ajuste de stock (entrada/salida)"""
+    ing = db.query(IngredienteStock).filter(IngredienteStock.id == ingrediente_id).first()
+    if not ing:
+        raise HTTPException(status_code=404, detail="Ingrediente no encontrado")
+    
+    if cantidad <= 0:
+        raise HTTPException(status_code=400, detail="La cantidad debe ser mayor a cero")
+    
+    # Validar stock suficiente para salida
+    if tipo == "salida":
+        stock_disponible = ing.stock_actual
+        if sucursal_id:
+            stock_suc = db.query(StockSucursal).filter(
+                StockSucursal.ingrediente_id == ingrediente_id,
+                StockSucursal.sucursal_id == sucursal_id,
+                StockSucursal.empresa_id == user.empresa_id
+            ).first()
+            stock_disponible = stock_suc.stock_actual if stock_suc else 0
+        if stock_disponible < cantidad:
+            raise HTTPException(status_code=400, detail=f"Stock insuficiente. Disponible: {stock_disponible}")
+    
+    # Aplicar ajuste
+    if tipo == "entrada":
+        ing.stock_actual += cantidad
+    else:
+        ing.stock_actual -= cantidad
+    
+    # Actualizar stock por sucursal si corresponde
+    if sucursal_id:
+        stock_suc = db.query(StockSucursal).filter(
+            StockSucursal.ingrediente_id == ingrediente_id,
+            StockSucursal.sucursal_id == sucursal_id,
+            StockSucursal.empresa_id == user.empresa_id
+        ).first()
+        if not stock_suc:
+            stock_suc = StockSucursal(
+                ingrediente_id=ingrediente_id,
+                sucursal_id=sucursal_id,
+                empresa_id=user.empresa_id,
+                stock_actual=0
+            )
+            db.add(stock_suc)
+        if tipo == "entrada":
+            stock_suc.stock_actual += cantidad
+        else:
+            stock_suc.stock_actual -= cantidad
+    
+    # Registrar en AjusteInventario
+    ajuste = AjusteInventario(
+        ingrediente_id=ingrediente_id,
+        sucursal_id=sucursal_id,
+        tipo=tipo,
+        cantidad=cantidad,
+        observaciones=observaciones or None,
+        usuario_id=user.id,
+        empresa_id=user.empresa_id,
+    )
+    db.add(ajuste)
+    db.commit()
+    
+    return RedirectResponse(url="/inventario", status_code=303)
 
 
 @app.post("/inventario/{ingrediente_id}/editar")
