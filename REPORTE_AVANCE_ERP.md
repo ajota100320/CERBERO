@@ -236,4 +236,52 @@ La transformación se completó **sin pérdida de datos** (Zero Data Loss) y con
   - Commit: `6c3280d` - "CRITICAL FIX: Restauracion de login publico, reparacion de navbar y redirecciones 303"
   - Push: `origin/main` actualizado (de `102c8c4` a `6c3280d`)
 
+
+---
+
+## 7.9 Estabilización final: Filtro de sucursales y botones de acción (agosto 2026)
+
+### 7.9.1 Filtro de sucursales activado en Backend (PASO 1)
+- Se agregó parámetro `sucursal_id` (opcional) a los endpoints principales:
+  * `GET /inventario` - filtra ingredientes que tienen stock en la sucursal seleccionada via `StockSucursal`
+  * `GET /mermas` - filtra registros de merma por `sucursal_id` directo
+  * `GET /proveedores` - acepta `sucursal_id` para consistencia de UI (proveedores son globales por empresa)
+  * `GET /` (Dashboard) - ya tenía `sucursal_id`, se aseguró propagación a template
+- La lógica respeta siempre el aislamiento multi-tenant (`empresa_id` del usuario autenticado)
+- Se pasó `sucursal_id` al contexto de cada template para preservarlo en paginación y filtros
+
+### 7.9.2 Reconexión de botones de acción CRUD (PASO 2)
+- **Inventario** (`templates/inventario/list.html`):
+  * Botón "Nuevo Ingrediente" → `/inventario/nuevo` ✓
+  * Botón "Editar" → `/inventario/{{ ing.id }}/editar` ✓
+  * Botón "Ajustar" → `/inventario/{{ ing.id }}/ajustar` ✓ (NUEVO endpoint)
+- **Proveedores** (`templates/proveedores/list.html`):
+  * Botón "Nuevo Proveedor" → `/proveedores/nuevo` ✓
+  * Botón "Editar" → `/proveedores/{{ prov.id }}/editar` ✓
+  * Botón "Eliminar" → POST `/proveedores/{{ prov.id }}/eliminar` con confirmación ✓
+- **Mermas** (`templates/mermas/list.html`):
+  * Botón "Registrar Merma" → `/mermas/nueva` ✓
+  * Botones "Aprobar"/"Rechazar" → POST `/mermas/{{ merma.id }}/aprobar|rechazar` con confirmación ✓
+- **Usuarios** (`templates/usuarios.html`):
+  * Formulario "Registrar Nuevo Usuario" → POST `/usuarios` ✓
+  * Botones "Activar"/"Desactivar" → POST `/usuarios/{{ u.id }}/toggle` con confirmación ✓
+
+### 7.9.3 Nuevo endpoint: Ajuste de Stock (PASO 2 complementario)
+- `GET /inventario/{ingrediente_id}/ajustar` - Formulario para ajustar stock (entrada/salida)
+- `POST /inventario/{ingrediente_id}/ajustar` - Procesa el ajuste, actualiza `IngredienteStock.stock_actual` y `StockSucursal`, registra en `AjusteInventario`
+- Template nuevo: `templates/inventario/ajustar.html` con selector de sucursal opcional
+
+### 7.9.4 Preservación de `sucursal_id` en navegación
+- Se agregó `<input type="hidden" name="sucursal_id" value="{{ sucursal_id or '' }}">` en todos los formularios de filtro
+- Se actualizaron todos los links de paginación para incluir `&sucursal_id={{ sucursal_id or '' }}`
+- Esto garantiza que al cambiar de página o filtrar, la sucursal seleccionada se mantiene
+
+### 7.9.5 Verificación Pre-Vuelo (PASO 4)
+- `python -m py_compile app/main.py` → **OK (silencioso)**
+- `python -c "from app.main import app"` → **OK (arranque sin errores)**
+
+### 7.9.6 Registro de Git
+- Commit: `0365856` - "Arquitectura: Botones de accion conectados y filtro de sucursales activado en backend"
+- Push: `origin/main` actualizado (de `3afd67f` a `0365856`)
+
 *Documento generado para seguimiento ejecutivo. Detalle técnico completo en CORE_ARCHITECTURE.md.*
