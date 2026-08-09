@@ -145,4 +145,27 @@ La transformación se completó **sin pérdida de datos** (Zero Data Loss) y con
   - Commit: `237994b` - "Hotfix: Corregir decorador del manejador 401"
   - Push: `origin/main` actualizado (de `c4b37e9` a `237994b`)
 
+
+---
+
+## 7.5 UI/UX Overhaul y preparación para limpieza de datos (agosto de 2026)
+
+### 7.5.1 Rebranding total a GastroFlow
+- Se reemplazó todo el texto hardcodeado "Templo del Smash" por "GastroFlow" en todas las plantillas HTML.
+- Se actualizó la etiqueta <title> y la barra de navegación superior (Navbar) para reflejar la nueva marca.
+
+### 7.5.2 Responsividad móvil en tablas
+- Todas las etiquetas <table> en las vistas principales (Dashboard, Inventario, Usuarios, etc.) fueron envueltas dentro de un <div class="overflow-x-auto w-full"> para permitir scroll horizontal en dispositivos móviles y evitar rupture de pantalla.
+
+### 7.5.3 Script de purga de datos semilla
+- Se creó el script independiente `scripts/limpiar_datos_semilla.py` que:
+  * Elimina todos los registros de las tablas transaccionales: RegistroCompra, DetalleCompra, RegistroMerma, y ControlGasto.
+  * Resetea el campo stock_actual de IngredienteStock a 0.
+- El script está diseñado para uso manual y no se importa ni ejecuta en app/main.py.
+- Se verificó la sintaxis con `python -m py_compile scripts/limpiar_datos_semilla.py` (sin errores).
+
+- **Registro de Git:**
+  - Commit: `8fedb98` - "UI: Rebranding a GastroFlow, tablas responsivas y script de purga"
+  - Push: `origin/main` actualizado (de `237994b` a `8fedb98`)
+
 *Documento generado para seguimiento ejecutivo. Detalle técnico completo en CORE_ARCHITECTURE.md.*
