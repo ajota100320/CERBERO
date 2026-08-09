@@ -131,4 +131,18 @@ La transformación se completó **sin pérdida de datos** (Zero Data Loss) y con
   - Commit: `c4b37e9` - "Hotfix: Manejador global 401 para redireccion a login"
   - Push: `origin/main` actualizado (de `4740f25` a `c4b37e9`)
 
+
+---
+
+## 7.4 Corrección de decorador del manejador 401 (hotfix quirúrgico)
+
+- **Problema detectado:** Tras aplicar el manejador global 401, el servidor colapsó en el evento de encendido con `TypeError: custom_http_exception_handler() missing 2 required positional arguments: 'request' and 'exc'`. Esto ocurrió porque el decorador `@app.exception_handler(StarletteHTTPException)` se había duplicado y, además, un decorador `@app.on_event("startup")` huérfano estaba colocado justo encima de la función del manejador, fazendo que FastAPI interprete erróneamente el manejador como una tarea de inicio.
+- **Diagnóstico y acciones realizadas:**
+  1. Se eliminó el decorador `@app.on_event("startup")` huérfano que estaba ubicado inmediatamente antes del bloque del manejador de excepciones.
+  2. Se eliminó la duplicación del bloque del manejador global 401, dejando solo una instancia ubicada correctamente después del evento de inicio y antes de las demás funciones.
+  3. Se verificó que el ÚNICO decorador inmediatamente arriba de `async def custom_http_exception_handler(request, exc):` sea estrictamente `@app.exception_handler(StarletteHTTPException)`.
+- **Registro de Git:**
+  - Commit: `237994b` - "Hotfix: Corregir decorador del manejador 401"
+  - Push: `origin/main` actualizado (de `c4b37e9` a `237994b`)
+
 *Documento generado para seguimiento ejecutivo. Detalle técnico completo en CORE_ARCHITECTURE.md.*
