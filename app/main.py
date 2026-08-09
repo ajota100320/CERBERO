@@ -5,6 +5,7 @@ from fastapi.responses import HTMLResponse, RedirectResponse, JSONResponse
 from fastapi.templating import Jinja2Templates
 from fastapi.staticfiles import StaticFiles
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
+from starlette.exceptions import HTTPException as StarletteHTTPException
 from sqlalchemy.orm import Session, joinedload
 from sqlalchemy import func, and_, or_, desc
 from jose import JWTError, jwt
@@ -112,6 +113,29 @@ async def _tenant_context_middleware(request: Request, call_next):
 
 # Inicializar BD al arrancar
 @app.on_event("startup")
+
+
+# ──────────────────────────────────────────────
+# MANEJO GLOBAL DE EXCEPCIONES PARA REDIRECCIÓN 401
+# ──────────────────────────────────────────────
+@app.exception_handler(StarletteHTTPException)
+async def custom_http_exception_handler(request, exc):
+    # Si el error es 401 (No Autenticado) y es una peticion web (GET), redirigir al login
+    if exc.status_code == 401 and request.method == "GET":
+        return RedirectResponse(url="/login", status_code=303)
+    # Para peticiones API (POST/PUT/DELETE) o cualquier otro error, mantener JSON
+    return JSONResponse({"detail": exc.detail}, status_code=exc.status_code)
+
+# ──────────────────────────────────────────────
+# MANEJO GLOBAL DE EXCEPCIONES PARA REDIRECCIÓN 401
+# ──────────────────────────────────────────────
+@app.exception_handler(StarletteHTTPException)
+async def custom_http_exception_handler(request, exc):
+    # Si el error es 401 (No Autenticado) y es una peticion web (GET), redirigir al login
+    if exc.status_code == 401 and request.method == "GET":
+        return RedirectResponse(url="/login", status_code=303)
+    # Para peticiones API (POST/PUT/DELETE) o cualquier otro error, mantener JSON
+    return JSONResponse({"detail": exc.detail}, status_code=exc.status_code)
 def startup_event():
     try:
         init_db()
