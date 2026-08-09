@@ -2209,6 +2209,16 @@ def _patched_TemplateResponse(*args, **kwargs):
     elif args:
         request = args[0]
     else:
+        # Inject sucursales into context if not present
+            if 'sucursales' not in context:
+                emp = getattr(request.state, 'empresa', None) if hasattr(request, 'state') else None
+                if emp:
+                    try:
+                        db = SessionLocal()
+                        sucursales_q = db.query(Sucursal).filter(Sucursal.empresa_id == emp.id, Sucursal.activa == True).order_by(Sucursal.nombre).all()
+                        context['sucursales'] = sucursales_q
+                    finally:
+                        db.close()
         return _original_TemplateResponse(*args, **kwargs)
 
     context = kwargs.get('context') or {}

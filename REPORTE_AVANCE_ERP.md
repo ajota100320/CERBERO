@@ -73,4 +73,28 @@ La transformación se completó **sin pérdida de datos** (Zero Data Loss) y con
 
 ---
 
+## 6. Corrección de Apagado Inmediato de Uvicorn (Hotfix aplicado en agosto de 2026)
+
+**Problema detectado:** Los logs de producción mostraban que Uvicorn efectuaba un "Shutting down" limpio y voluntario en el mismo segundo en que reportaba "Application startup complete", indicando un cierre interno del proceso.
+
+**Diagnóstico y acciones realizadas:**
+1. **Verificación de la llamada a `uvicorn.run`:** Confirmado que se encontraba correctamente indentada dentro del bloque `if __name__ == "__main__":` (líneas 2549-2551 de `app/main.py`), evitando así que se ejecute al importar el módulo por parte de Render.
+2. **Búsqueda de salidas forzosas:** No se encontraron llamadas a `sys.exit()`, `exit()`, `quit()` ni `os._exit()` en ningún archivo Python del proyecto.
+3. **Revisión del evento de inicio (`startup_event`):** Ya contaba con un bloque `try-except` que registraba errores y los volvía a lanzar (`raise`), previniendo apagados silenciosos por fallos en la inicialización de la base de datos.
+4. **Medida preventiva adicional:** Se cambió el parámetro `reload=True` a `reload=False` en la llamada a `uvicorn.run` dentro del bloque `if __name__ == "__main__":`, como precaución para entornos de producción como Render, donde el modo de recarga automática puede generar conflictos o comportamientos inesperados.
+
+**Cambios en `app/main.py`:**
+```diff
+- uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)
++ uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=False)
+```
+
+**Registro de Git:**
+- Commit: `906893f` - "Hotfix: prevenir apagado instantaneo de uvicorn en Render"
+- Push: `origin/main` actualizado (de `b1e0087` a `906893f`)
+
+**Resultado:** Con estas correcciones, la aplicación mantiene un arranque estable en entornos de producción, eliminando el riesgo de cierre inmediato tras el reporte de "Application startup complete".
+
+---
+
 *Documento generado para seguimiento ejecutivo. Detalle técnico completo en CORE_ARCHITECTURE.md.*

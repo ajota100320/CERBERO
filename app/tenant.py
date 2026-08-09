@@ -32,6 +32,7 @@ from app.database import Base
 # CONTEXTO DE TENANT (por request)
 # ──────────────────────────────────────────────
 tenant_context: ContextVar = ContextVar("tenant_context", default=None)
+sucursal_context: ContextVar = ContextVar("sucursal_context", default=None)
 
 
 def set_tenant(empresa_id: int | None) -> None:
@@ -44,6 +45,21 @@ def reset_tenant() -> None:
     tenant_context.set(None)
 
 
+
+# ──────────────────────────────────────────────
+# CONTEXTO DE SUCURSAL (por request)
+# ──────────────────────────────────────────────
+def set_sucursal(sucursal_id: int | None) -> None:
+    """Establece el sucursal activo para el request actual."""
+    sucursal_context.set(sucursal_id)
+
+def reset_sucursal() -> None:
+    """Limpia el sucursal activo (fin de request / middleware)."""
+    sucursal_context.set(None)
+
+def get_sucursal() -> int | None:
+    """Devuelve el sucursal activo (None si no hay contexto)."""
+    return sucursal_context.get()
 def get_tenant() -> int | None:
     """Devuelve el tenant activo (None si no hay contexto)."""
     return tenant_context.get()
