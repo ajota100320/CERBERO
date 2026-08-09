@@ -23,7 +23,7 @@
         </div>
         {% if incidencias %}
         <div class="overflow-x-auto">
-            <div class="overflow-x-auto w-full"><table class="w-full text-sm">
+            <div class="overflow-x-auto w-full"><div class="overflow-x-auto w-full"><table class="w-full text-sm">
                 <thead class="bg-gray-50">
                     <tr>
                         <th class="px-4 py-3 text-left font-medium text-gray-500">Tipo</th>
@@ -89,7 +89,7 @@
                     </tr>
                     {% endfor %}
                 </tbody>
-            </table></div>
+            </table></div></div>
         </div>
         {% else %}
         <div class="px-6 py-8 text-center text-gray-400">✨ No hay incidencias activas.</div>
@@ -103,7 +103,7 @@
         </div>
         {% if checklists %}
         <div class="overflow-x-auto">
-            <div class="overflow-x-auto w-full"><table class="w-full text-sm">
+            <div class="overflow-x-auto w-full"><div class="overflow-x-auto w-full"><table class="w-full text-sm">
                 <thead class="bg-gray-50">
                     <tr>
                         <th class="px-4 py-3 text-left font-medium text-gray-500">Tipo</th>
@@ -130,7 +130,7 @@
                     </tr>
                     {% endfor %}
                 </tbody>
-            </table></div>
+            </table></div></div>
         </div>
         {% else %}
         <div class="px-6 py-8 text-center text-gray-400">No hay checklists registrados aún.</div>
