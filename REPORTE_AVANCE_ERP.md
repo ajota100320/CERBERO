@@ -205,4 +205,35 @@ La transformación se completó **sin pérdida de datos** (Zero Data Loss) y con
   - Commit: `2cfee1c` - "Fix crítico: Reparar redirecciones 303 y limpieza manual de UI"
   - Push: `origin/main` actualizado (de `ec0a3a1` a `2cfee1c`)
 
+
+---
+
+## 7.8 Restauración crítica de UI/UX y arquitectura (agosto de 2026)
+
+### 7.8.1 Aislamiento de la plantilla de login
+- Se eliminó la herencia de `base.html` en `templates/login.html` para convertirla en una página pública independiente.
+- La página de login ahora tiene su propia estructura HTML completa con `<!DOCTYPE html>`, `<html>`, `<head>` (con Tailwind) y `<body>`, asegurando una experiencia de inicio de sesión limpia y centrada sin elementos de la aplicación privada.
+
+### 7.8.2 Reconstrucción de la barra superior (base.html)
+- Se actualizó el texto del perfil de usuario a "Administrador GastroFlow" en ambas versiones (desktop y móvil).
+- Se reconstruyó el selector de sucursales exactamente como se especificó, sin `optgroup` y con estilos nativos de Tailwind (`bg-gray-800 text-white border border-gray-600 rounded px-4 py-2 text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-blue-500 whitespace-nowrap`).
+- El selector ahora redirige a `?sucursal_id=` + valor al cambiar, manteniendo la URL actual.
+
+### 7.8.3 Reparación del enrutamiento (Error "See Other")
+- Se reemplazó completamente el `custom_http_exception_handler` en `app/main.py` por una versión que:
+  * Respeta las redirecciones de FastAPI (códigos 302, 303, 307, 308) ejecutándolas normalmente.
+  * Redirige a `/login` con código 303 para errores 401 (No Autenticado).
+  * Devuelve JSON para cualquier otro error.
+- Esto evita que el handler interceptions las redirecciones legítimas y devuelva JSON, lo que causaba pantallas negras en el Dashboard y Operaciones.
+
+### 7.8.4 Limpieza de vistas (Efecto Frankenstein)
+- Se verificó y limpió `dashboard.html`, `inventario/list.html` y `proveedores/list.html` para asegurar que:
+  * Ninguna contiene etiquetas `<nav>`, `<header>` o `<select>` de sucursales hardcodeadas.
+  * Todo el contenido está exclusivamente dentro de `{% block content %} ... {% endblock %}`.
+  * Se eliminó cualquier referencia residual a "Templo del Smash" y se aseguró el uso de `{% extends "base.html" %}`.
+
+- **Registro de Git:**
+  - Commit: `6c3280d` - "CRITICAL FIX: Restauracion de login publico, reparacion de navbar y redirecciones 303"
+  - Push: `origin/main` actualizado (de `102c8c4` a `6c3280d`)
+
 *Documento generado para seguimiento ejecutivo. Detalle técnico completo en CORE_ARCHITECTURE.md.*
