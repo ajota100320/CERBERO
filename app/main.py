@@ -2202,39 +2202,38 @@ async def inject_current_user_middleware(request: Request, call_next):
 _original_TemplateResponse = templates.TemplateResponse
 
 def _patched_TemplateResponse(*args, **kwargs):
-    """Wrapper que añade current_user y empresa al context automáticamente.
-    Respeta cualquier valor que la ruta ya haya pasado explícitamente."""
+    """Wrapper que añade current_user y empresa al context automáticamente."""
     if 'request' in kwargs:
         request = kwargs['request']
     elif args:
         request = args[0]
     else:
-        # Inject sucursales into context if not present
-            if 'sucursales' not in context:
-                emp = getattr(request.state, 'empresa', None) if hasattr(request, 'state') else None
-                if emp:
-                    try:
-                        db = SessionLocal()
-                        sucursales_q = db.query(Sucursal).filter(Sucursal.empresa_id == emp.id, Sucursal.activa == True).order_by(Sucursal.nombre).all()
-                        context['sucursales'] = sucursales_q
-                    finally:
-                        db.close()
-        return _original_TemplateResponse(*args, **kwargs)
-
+        # This branch should not happen in normal operation because the view functions always pass request?
+        # But we keep it for safety.
+        request = None
     context = kwargs.get('context') or {}
     # current_user (legacy, compatibilidad con rutas existentes)
     if 'current_user' not in context:
-        cu = getattr(request.state, 'current_user', None) if hasattr(request, 'state') else None
+        cu = getattr(request.state, 'current_user', None) if request and hasattr(request, 'state') else None
         if cu:
             context['current_user'] = cu
     # Branding dinámico: empresa desde request.state (cargada por get_current_user)
     if 'empresa' not in context:
-        emp = getattr(request.state, 'empresa', None) if hasattr(request, 'state') else None
+        emp = getattr(request.state, 'empresa', None) if request and hasattr(request, 'state') else None
         if emp:
             context['empresa'] = emp
+    # Inject sucursales into context if not present
+    if 'sucursales' not in context:
+        emp = getattr(request.state, 'empresa', None) if request and hasattr(request, 'state') else None
+        if emp:
+            try:
+                db = SessionLocal()
+                sucursales_q = db.query(Sucursal).filter(Sucursal.empresa_id == emp.id, Sucursal.activa == True).order_by(Sucursal.nombre).all()
+                context['sucursales'] = sucursales_q
+            finally:
+                db.close()
     kwargs['context'] = context
     return _original_TemplateResponse(*args, **kwargs)
-
 templates.TemplateResponse = _patched_TemplateResponse
 
 
