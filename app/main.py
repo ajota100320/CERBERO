@@ -112,30 +112,23 @@ async def _tenant_context_middleware(request: Request, call_next):
     return response
 
 # Inicializar BD al arrancar
+
+
+# ──────────────────────────────────────────────
+# MANEJO GLOBAL DE EXCEPCIONES PARA REDIRECCIÓN 401
+# ──────────────────────────────────────────────
+@app.exception_handler(StarletteHTTPException)
+async def custom_http_exception_handler(request, exc):
+    # Si el error es 401 (No Autenticado) y es una peticion web (GET), redirigir al login
+    if exc.status_code == 401 and request.method == "GET":
+        return RedirectResponse(url="/login", status_code=303)
+    # Para peticiones API (POST/PUT/DELETE) o cualquier otro error, mantener JSON
+    return JSONResponse({"detail": exc.detail}, status_code=exc.status_code)
+
+# ──────────────────────────────────────────────
+# MANEJO GLOBAL DE EXCEPCIONES PARA REDIRECCIÓN 401
+# ──────────────────────────────────────────────
 @app.on_event("startup")
-
-
-# ──────────────────────────────────────────────
-# MANEJO GLOBAL DE EXCEPCIONES PARA REDIRECCIÓN 401
-# ──────────────────────────────────────────────
-@app.exception_handler(StarletteHTTPException)
-async def custom_http_exception_handler(request, exc):
-    # Si el error es 401 (No Autenticado) y es una peticion web (GET), redirigir al login
-    if exc.status_code == 401 and request.method == "GET":
-        return RedirectResponse(url="/login", status_code=303)
-    # Para peticiones API (POST/PUT/DELETE) o cualquier otro error, mantener JSON
-    return JSONResponse({"detail": exc.detail}, status_code=exc.status_code)
-
-# ──────────────────────────────────────────────
-# MANEJO GLOBAL DE EXCEPCIONES PARA REDIRECCIÓN 401
-# ──────────────────────────────────────────────
-@app.exception_handler(StarletteHTTPException)
-async def custom_http_exception_handler(request, exc):
-    # Si el error es 401 (No Autenticado) y es una peticion web (GET), redirigir al login
-    if exc.status_code == 401 and request.method == "GET":
-        return RedirectResponse(url="/login", status_code=303)
-    # Para peticiones API (POST/PUT/DELETE) o cualquier otro error, mantener JSON
-    return JSONResponse({"detail": exc.detail}, status_code=exc.status_code)
 def startup_event():
     try:
         init_db()

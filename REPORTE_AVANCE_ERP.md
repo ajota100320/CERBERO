@@ -97,4 +97,38 @@ La transformación se completó **sin pérdida de datos** (Zero Data Loss) y con
 
 ---
 
+
+---
+
+## 7. Mejoras de UX y manejo de errores (agosto de 2026)
+
+### 7.1 Parche defensivo UI para Errores 500 y conexión onchange en selector
+- **Problema detectado:** Las rutas secundarias (como /inventario, /mermas) arrojaban Error 500 debido a un `UndefinedError` en Jinja2 porque la plantilla base exigía la variable `sucursales` para el nuevo dropdown del navbar, y estas rutas no la estaban enviando en su context.
+- **Diagnóstico y acciones realizadas:**
+  1. **Parche Defensivo (Frontend - HTML):** Se envolvió el bloque del selector de sucursales en `templates/base.html` con un condicional de seguridad: `{% if sucursales is defined %} ... {% endif %}`. Esto evita que la página colapse si el backend omite la variable.
+  2. **Parche Global (Backend - main.py):** Se inyectó la consulta de las sucursales del usuario directamente en el contexto global mediante el wrapper `TemplateResponse` (middleware de UI), de modo que todas las vistas heredan la variable automáticamente sin tener que tocar ningún endpoint de las rutas operativas.
+  3. **Activación del Selector (JavaScript):** Se añadió un manejador `onchange` al `<select>` de sucursales del frontend para recargar la página al cambiar de sucursal, manteniendo los parámetros de filtros y paginación mediante `window.location.href`.
+- **Registro de Git:**
+  - Commit: `958ed72` - "Hotfix: Parche defensivo UI para Errores 500 y conexion onchange en selector"
+  - Push: `origin/main` actualizado (de `906893f` a `958ed72`)
+
+### 7.2 Corrección de IndentationError en TemplateResponse (hotfix quirúrgico)
+- **Problema detectado:** Un commit previo introdujo un error de sangría (IndentationError) en la función `_patched_TemplateResponse` de `app/main.py`, específicamente alrededor de la línea 2222, causando que la aplicación fallara al arranque en producción.
+- **Diagnóstico y acciones realizadas:**
+  1. Se abrió `app/main.py` y se corrigió la indentación del bloque `else` dentro de `_patched_TemplateResponse`, alineando correctamente los espacios (4 espacios por nivel) para que coincidieran con la estructura de la función padre.
+  2. Se verificó localmente con `python -m py_compile app/main.py` que no hubiera errores de sintaxis.
+- **Registro de Git:**
+  - Commit: `4740f25` - "Hotfix: Corregir IndentationError en TemplateResponse"
+  - Push: `origin/main` actualizado (de `958ed72` a `4740f25`)
+
+### 7.3 Manejador global 401 para redirección a login (mejora de UX)
+- **Problema detectado:** Al expirar la sesión, las peticiones GET a rutas protegidas devolvían una respuesta JSON cruda con `{ "detail": "Not Authenticated" }` en lugar de redirigir al usuario a la página de login, lo que provocaba una mala experiencia de usuario (pantalla blanca o mensaje crudo).
+- **Diagnóstico y acciones realizadas:**
+  1. Se importó `StarletteHTTPException` desde `starlette.exceptions` en la sección de imports de `app/main.py`.
+  2. Se añadió un manejador global de excepciones mediante `@app.exception_handler(StarletteHTTPException)` que intercepta todos los `HTTPException`.
+  3. En el manejador, si el error es 401 (No Autenticado) y la petición es GET, se devuelve una `RedirectResponse` a `/login` con código de estado 303 (See Other). Para peticiones API (POST/PUT/DELETE) u otros errores, se mantiene la respuesta JSON original.
+- **Registro de Git:**
+  - Commit: `c4b37e9` - "Hotfix: Manejador global 401 para redireccion a login"
+  - Push: `origin/main` actualizado (de `4740f25` a `c4b37e9`)
+
 *Documento generado para seguimiento ejecutivo. Detalle técnico completo en CORE_ARCHITECTURE.md.*
