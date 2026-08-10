@@ -1,9 +1,7 @@
 from datetime import datetime, date, time, timedelta
 from typing import Optional, List
 from fastapi import FastAPI, Request, Depends, Form, HTTPException, Query, status
-from fastapi.responses import HTMLResponse, RedirectResponse, JSONResponse
-from fastapi.templating import Jinja2Templates
-from fastapi.staticfiles import StaticFiles
+from fastapi.responses import JSONResponse
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from starlette.exceptions import HTTPException as StarletteHTTPException
 from sqlalchemy.orm import Session, joinedload
@@ -67,9 +65,9 @@ from app.tenant import tenant_context, set_tenant, reset_tenant
 # INICIALIZACIÓN DE LA APP
 # ──────────────────────────────────────────────
 app = FastAPI(
-    title="ERP Gastronómico",
-    description="Sistema de Gestión Integral para Cocinas Profesionales",
-    version="2.1.0",
+    title="ERP Gastronómico API",
+    description="Sistema de Gestión Integral para Cocinas Profesionales - REST API",
+    version="3.0.0",
     docs_url="/api/docs",
     redoc_url="/api/redoc"
 )
@@ -83,7 +81,7 @@ from uvicorn.middleware.proxy_headers import ProxyHeadersMiddleware
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["https://*.onrender.com", "http://localhost:8000", "http://127.0.0.1:8000"],
-    allow_credentials=True,          # ← CLAVE: permite cookies en peticiones cross-origin
+    allow_credentials=True,
     allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"],
     allow_headers=["*"],
 )
@@ -93,16 +91,9 @@ app.add_middleware(
 # ──────────────────────────────────────────────
 app.add_middleware(ProxyHeadersMiddleware, trusted_hosts=["*"])
 
-# Configurar templates y archivos estáticos
-templates = Jinja2Templates(directory=os.path.join(PROJECT_DIR, "templates"))
-app.mount("/static", StaticFiles(directory=os.path.join(PROJECT_DIR, "static")), name="static")
-
 # ──────────────────────────────────────────────
 # MULTI-TENANT: MIDDLEWARE DE CONTEXTO (aislamiento por request)
 # ──────────────────────────────────────────────
-# Resetea el tenant_context al inicio y fin de CADA petición HTTP para
-# evitar fugas entre requests concurrentes (contextvars es thread-safe).
-# El valor real del tenant lo inyecta get_current_user al decodificar el JWT.
 @app.middleware("http")
 async def _tenant_context_middleware(request: Request, call_next):
     reset_tenant()
@@ -112,28 +103,25 @@ async def _tenant_context_middleware(request: Request, call_next):
         reset_tenant()
     return response
 
-# Inicializar BD al arrancar
-
-
 # ──────────────────────────────────────────────
-# MANEJO GLOBAL DE EXCEPCIONES PARA REDIRECCIÓN 401
+# MANEJO GLOBAL DE EXCEPCIONES - JSON ONLY
 # ──────────────────────────────────────────────
 @app.exception_handler(StarletteHTTPException)
 async def custom_http_exception_handler(request, exc):
-    # Respetar redirecciones de FastAPI (ej. 303 See Other)
+    # Respetar redirecciones de FastAPI (ej. 303 See Other) - solo para compatibilidad
     if exc.status_code in [302, 303, 307, 308]:
         location = exc.headers.get("Location") if exc.headers else "/login"
-        return RedirectResponse(url=location, status_code=exc.status_code)
+        return JSONResponse({"detail": "Redirect", "location": location}, status_code=exc.status_code)
     
-    # Si es 401 (No Autenticado) redirigir a login
+    # Si es 401 (No Autenticado) devolver JSON
     if exc.status_code == 401:
-        return RedirectResponse(url="/login", status_code=303)
+        return JSONResponse({"detail": "No autenticado", "code": "UNAUTHORIZED"}, status_code=401)
         
     # Cualquier otro error, devolver JSON
     return JSONResponse({"detail": exc.detail}, status_code=exc.status_code)
 
 # ──────────────────────────────────────────────
-# MANEJO GLOBAL DE EXCEPCIONES PARA REDIRECCIÓN 401
+# EVENTO DE INICIO
 # ──────────────────────────────────────────────
 @app.on_event("startup")
 def startup_event():
@@ -142,17 +130,14 @@ def startup_event():
         db = SessionLocal()
         seed_initial_data(db)
         db.close()
-    
-    
-    # ──────────────────────────────────────────────
-    # AUTENTICACIÓN Y AUTORIZACIÓN
-    # ──────────────────────────────────────────────
-    
     except Exception as e:
         import logging
         logging.error(f"Failed to initialize application: {e}")
-        # Re-raise to prevent the app from starting in a broken state
         raise
+
+# ──────────────────────────────────────────────
+# AUTENTICACIÓN Y AUTORIZACIÓN
+# ──────────────────────────────────────────────
 def verify_password(plain_password: str, hashed_password: str) -> bool:
     return bcrypt.checkpw(plain_password.encode('utf-8'), hashed_password.encode('utf-8'))
 
@@ -179,14 +164,10 @@ def decode_token(token: str) -> Optional[dict]:
         return None
 
 async def get_current_user(request: Request, db: Session = Depends(get_db)) -> Optional[Usuario]:
-    """Obtiene usuario actual desde cookie JWT httponly 'access_token'.
-    MULTI-TENANT: al autenticar, inyecta el empresa_id del JWT en el
-    tenant_context para que el listener do_orm_execute filtre todas las
-    consultas de esta petición a la empresa del usuario."""
+    """Obtiene usuario actual desde cookie JWT httponly 'access_token'."""
     token = request.cookies.get("access_token")
     if not token:
         return None
-    # Limpiar prefijo "Bearer " si está presente
     if token.startswith("Bearer "):
         token = token[7:]
     payload = decode_token(token)
@@ -195,39 +176,25 @@ async def get_current_user(request: Request, db: Session = Depends(get_db)) -> O
     user_id = payload.get("sub")
     if not user_id:
         return None
-    # Multi-Tenant: extraer empresa_id del JWT e inyectarlo en el contexto
     empresa_id = payload.get("empresa_id")
     if empresa_id is not None:
         try:
             set_tenant(int(empresa_id))
         except (TypeError, ValueError):
             set_tenant(None)
-    # SQLAlchemy compara Integer column; convertir a int para match exacto
     try:
         user_id_int = int(user_id)
     except (TypeError, ValueError):
         return None
     user = db.query(Usuario).filter(Usuario.id == user_id_int, Usuario.activo == True).first()
-    # Multi-Tenant: super-admin ve TODAS las empresas (sin filtro)
     if user and user.rol == RolUsuario.SUPER_ADMIN:
         set_tenant(None)
-    # Branding dinámico: cargar datos de la empresa en request.state
-    # para que el context processor los inyecte en todos los templates
-    if user and user.empresa_id:
-        empresa = db.query(Empresa).filter(Empresa.id == user.empresa_id).first()
-        if empresa:
-            request.state.empresa = empresa
     return user
 
 # ──────────────────────────────────────────────
 # DEPENDENCIAS DE SEGURIDAD JERÁRQUICA (RBAC)
 # ──────────────────────────────────────────────
-
-# ──────────────────────────────────────────────
-# DEPENDENCIA GENÉRICA DE ROLES
-# ──────────────────────────────────────────────
 def require_roles(*allowed_roles):
-    """Devuelve una dependency que requiere que el usuario tenga uno de los roles permitidos."""
     def role_checker(current_user: Usuario = Depends(get_current_user)):
         if current_user is None:
             raise HTTPException(status_code=401, detail="Not authenticated")
@@ -236,94 +203,56 @@ def require_roles(*allowed_roles):
         return current_user
     return role_checker
 
-# ──────────────────────────────────────────────
-# DEPENDENCIA GENÉRICA DE ROLES
-# ──────────────────────────────────────────────
 async def get_admin_user(current_user: Usuario = Depends(require_roles(RolUsuario.ADMINISTRADOR, RolUsuario.SUPER_ADMIN))) -> Usuario:
-    """Requiere rol ADMINISTRADOR o SUPER_ADMIN."""
     return current_user
+
 async def get_encargado_user(current_user: Usuario = Depends(require_roles(RolUsuario.ENCARGADO, RolUsuario.ADMINISTRADOR, RolUsuario.SUPER_ADMIN))) -> Usuario:
-    """Requiere rol ENCARGADO, ADMINISTRADOR o SUPER_ADMIN."""
     return current_user
+
 async def get_super_admin_user(current_user: Usuario = Depends(require_roles(RolUsuario.SUPER_ADMIN))) -> Usuario:
-    """Requiere rol SUPER_ADMIN."""
     return current_user
-
-
-    """Devuelve una dependency que requiere que el usuario tenga uno de los roles permitidos."""
-    def role_checker(current_user: Usuario = Depends(get_current_user)):
-        if current_user is None:
-            raise HTTPException(status_code=401, detail="Not authenticated")
-        if current_user.rol not in allowed_roles:
-            raise HTTPException(status_code=403, detail="Insufficient permissions")
-        return current_user
-    return role_checker
 
 async def require_auth(request: Request, db: Session = Depends(get_db)) -> Usuario:
-    """Dependency que requiere usuario autenticado.
-    Para rutas web retorna RedirectResponse 303 a /login.
-    Para rutas /api/ lanza 401 JSON."""
+    """Dependency que requiere usuario autenticado. Devuelve 401 JSON si no autenticado."""
     user = await get_current_user(request, db)
     if not user:
-        if request.url.path.startswith("/api/"):
-            raise HTTPException(status_code=401, detail="No autenticado")
-        # Redirección web: retornar RedirectResponse directamente (corta el flujo)
-        return RedirectResponse(url="/login", status_code=status.HTTP_303_SEE_OTHER)
-    # ── SEGURIDAD PRIMER INGRESO ──────────────────────────────
-    # Usuario con clave temporal (debe_cambiar_password=True) es
-    # redirigido a /cambiar-password hasta completar el cambio.
-    # Whitelist: rutas necesarias para completar el flujo.
+        raise HTTPException(status_code=401, detail="No autenticado")
     if user.debe_cambiar_password:
         path = request.url.path
         whitelist = {"/cambiar-password", "/logout", "/login"}
-        if not (path in whitelist or path.startswith("/static")):
-            if path.startswith("/api/"):
-                raise HTTPException(
-                    status_code=403,
-                    detail="password_change_required",
-                    headers={"Location": "/cambiar-password"},
-                )
+        if not (path in whitelist or path.startswith("/api/")):
             raise HTTPException(
-                status_code=status.HTTP_303_SEE_OTHER,
+                status_code=403,
+                detail="password_change_required",
                 headers={"Location": "/cambiar-password"},
             )
     return user
 
 async def require_admin(user: Usuario = Depends(get_current_user)) -> Usuario:
-    """Dependency que requiere rol ADMINISTRADOR o SUPER_ADMIN."""
     if user is None:
         raise HTTPException(status_code=401, detail="Not authenticated")
     if user.rol not in (RolUsuario.ADMINISTRADOR, RolUsuario.SUPER_ADMIN):
         raise HTTPException(status_code=403, detail="Acceso denegado: se requiere rol Administrador o Super Admin")
     return user
+
 async def require_encargado_or_admin(user: Usuario = Depends(require_auth)) -> Usuario:
-    """Dependency que requiere ENCARGADO o ADMINISTRADOR"""
     if user.rol not in [RolUsuario.ENCARGADO, RolUsuario.ADMINISTRADOR]:
         raise HTTPException(status_code=403, detail="Acceso denegado: se requiere rol Encargado o superior")
     return user
 
-
 async def require_super_admin(request: Request, db: Session = Depends(get_db)) -> Usuario:
-    """Dependency exclusiva del Dueño del SaaS. BLINDADA:
-    - Solo SUPER_ADMIN accede (404 si otro rol — ni revela que la ruta existe).
-    - Resetea tenant_context para ver TODAS las empresas sin filtro."""
     user = await require_auth(request, db)
     if user.rol != RolUsuario.SUPER_ADMIN:
         raise HTTPException(status_code=404)
-    # Super-admin ve todas las empresas: desactiva el filtro multi-tenant
     reset_tenant()
     return user
-
 
 # ──────────────────────────────────────────────
 # TELEGRAM NOTIFICACIONES
 # ──────────────────────────────────────────────
-
 async def enviar_alerta_telegram(mensaje: str, parse_mode: str = "HTML") -> bool:
-    """Envía mensaje a Telegram usando Bot API"""
     if not TELEGRAM_BOT_TOKEN or not TELEGRAM_CHAT_ID:
         return False
-    
     url = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendMessage"
     payload = {
         "chat_id": TELEGRAM_CHAT_ID,
@@ -331,7 +260,6 @@ async def enviar_alerta_telegram(mensaje: str, parse_mode: str = "HTML") -> bool
         "parse_mode": parse_mode,
         "disable_web_page_preview": True
     }
-    
     try:
         async with httpx.AsyncClient(timeout=10.0) as client:
             response = await client.post(url, json=payload)
@@ -348,8 +276,6 @@ async def crear_notificacion_y_telegram(
     entidad_relacionada: str = None,
     entidad_id: int = None
 ):
-    """Crea notificación en BD y envía a Telegram"""
-    # Crear en BD
     notif = Notificacion(
         usuario_id=usuario_id,
         titulo=titulo,
@@ -360,33 +286,25 @@ async def crear_notificacion_y_telegram(
     )
     db.add(notif)
     db.flush()
-    
-    # Enviar a Telegram (formato bonito)
     telegram_msg = (
         f"<b>🔔 {titulo}</b>\n\n"
         f"{mensaje}\n\n"
         f"<i>Tipo: {tipo.value}</i>"
     )
     await enviar_alerta_telegram(telegram_msg)
-    
     return notif
 
 async def notificar_stock_critico(db: Session):
-    """Verifica stock crítico y notifica a encargados/admins"""
     items_criticos = db.query(IngredienteStock).filter(
         IngredienteStock.activo == True,
         IngredienteStock.stock_actual <= IngredienteStock.stock_minimo
     ).all()
-    
     if not items_criticos:
         return
-    
-    # Obtener usuarios que deben recibir alertas (ENCARGADO y ADMINISTRADOR)
     usuarios_alerta = db.query(Usuario).filter(
         Usuario.activo == True,
         Usuario.rol.in_([RolUsuario.ENCARGADO, RolUsuario.ADMINISTRADOR])
     ).all()
-    
     for item in items_criticos:
         msg = (
             f"⚠️ <b>STOCK CRÍTICO</b>\n\n"
@@ -395,7 +313,6 @@ async def notificar_stock_critico(db: Session):
             f"Stock mínimo: {item.stock_minimo} {item.unidad_medida.value}\n"
             f"Categoría: {item.categoria.value}"
         )
-        
         for user in usuarios_alerta:
             await crear_notificacion_y_telegram(
                 db, user.id,
@@ -405,11 +322,9 @@ async def notificar_stock_critico(db: Session):
                 "ingrediente", item.id
             )
 
-
 # ──────────────────────────────────────────────
 # HELPERS & UTILIDADES
 # ──────────────────────────────────────────────
-
 def get_current_date():
     return date.today()
 
@@ -417,23 +332,17 @@ def get_current_time():
     return datetime.now().time()
 
 def calculate_dashboard_stats(db: Session, sucursal_id: int = None) -> dict:
-    # FILTRO MULTI-TENANT: obtener tenant_id del contexto
     from app.tenant import tenant_context
     tenant_id = tenant_context.get()
-
-    # Subconsulta de IDs de usuarios de la sucursal (los registros operativos
-    # se vinculan a sucursal vía el usuario responsable/creador)
     usuarios_subq = None
     if sucursal_id:
         usuarios_subq = db.query(Usuario.id).filter(Usuario.sucursal_id == sucursal_id).scalar_subquery()
 
     def apply_tenant_filter(query, model_class):
-        """Aplica filtro de tenant si hay contexto activo"""
         if tenant_id is not None and hasattr(model_class, 'empresa_id'):
             return query.filter(model_class.empresa_id == tenant_id)
         return query
 
-    # Stock crítico: tabla maestra única (consolidado global, no tiene sucursal)
     stock_critico_q = db.query(IngredienteStock).filter(
         IngredienteStock.activo == True,
         IngredienteStock.stock_actual <= IngredienteStock.stock_minimo
@@ -506,20 +415,11 @@ def calculate_dashboard_stats(db: Session, sucursal_id: int = None) -> dict:
         "gastos_mes": round(gastos_mes, 2),
     }
 
-
 # ──────────────────────────────────────────────
-# RUTAS DE AUTENTICACIÓN
+# RUTAS DE AUTENTICACIÓN (API ONLY - JSON)
 # ──────────────────────────────────────────────
 
-@app.get("/login", response_class=HTMLResponse)
-async def login_form(request: Request):
-    return templates.TemplateResponse(request=request, name="login.html", context={
-        "request": request,
-        "error": None,
-        "email": None
-    })
-
-@app.post("/login", response_class=HTMLResponse)
+@app.post("/login")
 async def login_post(
     request: Request,
     db: Session = Depends(get_db),
@@ -530,20 +430,12 @@ async def login_post(
     user = db.query(Usuario).filter(Usuario.email == email, Usuario.activo == True).first()
     
     if not user or not verify_password(password, user.password_hash):
-        return templates.TemplateResponse(request=request, name="login.html", context={
-            "request": request,
-            "error": "Credenciales inválidas",
-            "email": email
-        }, status_code=401)
+        raise HTTPException(status_code=401, detail="Credenciales inválidas")
     
-    # Actualizar último acceso
     user.ultimo_acceso = func.now()
     db.commit()
     
-    # Crear token (sub debe ser string segun RFC 7519 / python-jose lo valida)
-    # MULTI-TENANT: incrusta empresa_id del usuario para que get_current_user
-    # lo inyecte en el tenant_context y filtre toda la petición a su empresa.
-    expire_minutes = ACCESS_TOKEN_EXPIRE_MINUTES if remember else 60  # 1h si no "recordarme"
+    expire_minutes = ACCESS_TOKEN_EXPIRE_MINUTES if remember else 60
     token = create_access_token(
         data={
             "sub": str(user.id),
@@ -554,9 +446,7 @@ async def login_post(
         expires_delta=timedelta(minutes=expire_minutes)
     )
     
-    # Redirigir a dashboard con cookie httponly (solo el JWT, sin prefijo Bearer para evitar problemas de encoding de cookie)
-    response = RedirectResponse(url="/", status_code=status.HTTP_303_SEE_OTHER)
-    # Configuración de cookie segura para móvil y web
+    response = JSONResponse({"message": "Autenticación exitosa", "user": {"id": user.id, "email": user.email, "rol": user.rol.value}})
     response.set_cookie(
         key="access_token",
         value=token,
@@ -564,14 +454,13 @@ async def login_post(
         secure=True,
         samesite="lax",
         max_age=expire_minutes * 60,
-        path="/",                       # Disponible en toda la app
+        path="/",
     )
     return response
 
-@app.get("/logout")
+@app.post("/logout")
 async def logout(request: Request):
-    is_production = os.getenv("ENVIRONMENT", "development").lower() == "production"
-    response = RedirectResponse(url="/login", status_code=303)
+    response = JSONResponse({"message": "Sesión cerrada"})
     response.delete_cookie(
         key="access_token",
         path="/",
@@ -580,31 +469,11 @@ async def logout(request: Request):
     )
     return response
 
-
 # ──────────────────────────────────────────────
-# SEGURIDAD PRIMER INGRESO — Cambio de clave temporal
+# CAMBIO DE CONTRASEÑA (API)
 # ──────────────────────────────────────────────
-# Plantilla standalone (sin menús): el usuario forzado no puede navegar
-# mientras deba_cambiar_password=True (require_auth lo encierra aquí).
 
-@app.get("/cambiar-password", response_class=HTMLResponse)
-async def cambiar_password_form(
-    request: Request,
-    user: Usuario = Depends(require_auth),
-):
-    """Formulario de cambio de clave (primer ingreso / clave temporal)."""
-    if not user.debe_cambiar_password:
-        # No está forzado → permitir cambio voluntario igualmente (mismo form)
-        pass
-    return templates.TemplateResponse(request=request, name="cambiar_password.html", context={
-        "request": request,
-        "user": user,
-        "error": None,
-        "success": None,
-    })
-
-
-@app.post("/cambiar-password", response_class=HTMLResponse)
+@app.post("/cambiar-password")
 async def cambiar_password_post(
     request: Request,
     db: Session = Depends(get_db),
@@ -613,46 +482,30 @@ async def cambiar_password_post(
     nueva_password: str = Form(...),
     confirmar_password: str = Form(...),
 ):
-    """Valida clave actual, aplica nueva clave (mín. 8), limpia el flag
-    debe_cambiar_password y rota la sesión (nueva cookie JWT)."""
-    def _render(error: str, status_code: int = 400):
-        return templates.TemplateResponse(request=request, name="cambiar_password.html", context={
-            "request": request,
-            "user": user,
-            "error": error,
-            "success": None,
-        }, status_code=status_code)
-
-    # 1. Validar clave actual
     if not verify_password(password_actual, user.password_hash):
-        return _render("La contraseña actual es incorrecta.")
-    # 2. Validar nueva clave
+        raise HTTPException(status_code=400, detail="La contraseña actual es incorrecta.")
     if len(nueva_password) < 8:
-        return _render("La nueva contraseña debe tener al menos 8 caracteres.")
+        raise HTTPException(status_code=400, detail="La nueva contraseña debe tener al menos 8 caracteres.")
     if nueva_password == password_actual:
-        return _render("La nueva contraseña debe ser distinta a la actual.")
+        raise HTTPException(status_code=400, detail="La nueva contraseña debe ser distinta a la actual.")
     if nueva_password != confirmar_password:
-        return _render("La confirmación no coincide con la nueva contraseña.")
+        raise HTTPException(status_code=400, detail="La confirmación no coincide con la nueva contraseña.")
 
-    # 3. Aplicar nuevo hash + limpiar flag
     user.password_hash = get_password_hash(nueva_password)
     user.debe_cambiar_password = False
     user.ultimo_acceso = func.now()
     db.commit()
 
-    # 4. Regenerar sesión: nuevo JWT (la cookie vieja queda invalidada por reemplazo)
     token = create_access_token(
-            data={
-                "sub": str(user.id),
-                "email": user.email,
-                "rol": user.rol.value,
-                "empresa_id": user.empresa_id,
-            },
-            expires_delta=timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
-        )
-    response = RedirectResponse(url="/", status_code=status.HTTP_303_SEE_OTHER)
-    # Configuración de cookie compatible con móvil (iOS/Safari, Android/Chrome)
-    is_production = os.getenv("ENVIRONMENT", "development").lower() == "production"
+        data={
+            "sub": str(user.id),
+            "email": user.email,
+            "rol": user.rol.value,
+            "empresa_id": user.empresa_id,
+        },
+        expires_delta=timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
+    )
+    response = JSONResponse({"message": "Contraseña actualizada correctamente"})
     response.set_cookie(
         key="access_token",
         value=token,
@@ -660,652 +513,20 @@ async def cambiar_password_post(
         secure=True,
         samesite="lax",
         max_age=ACCESS_TOKEN_EXPIRE_MINUTES * 60,
-        path="/",                       # Disponible en toda la app
+        path="/",
     )
     return response
 
-
-
-
 # ──────────────────────────────────────────────
-# PANEL MASTER — Solo Super-Admin (Dueño del SaaS)
+# API ENDPOINTS - DASHBOARD & STATS
 # ──────────────────────────────────────────────
 
-@app.get("/saas-master", response_class=HTMLResponse)
-async def saas_master_panel(
-    request: Request,
-    db: Session = Depends(get_db),
-    user: Usuario = Depends(get_super_admin_user)
-):
-    """Panel exclusivo del dueño del SaaS. BLINDADO:
-    - require_super_admin fuerza reset_tenant() → ve TODAS las empresas.
-    - Administradores de empresa reciben 404 (ni saben que existe).
-    - Menú solo visible en base.html si user.rol == SUPER_ADMIN.
-    """
-    empresas = db.query(Empresa).order_by(Empresa.id).all()
-    return templates.TemplateResponse(request=request, name="saas_master.html", context={
-        "request": request,
-        "user": user,
-        "empresas": empresas,
-    })
-
-
-# ──────────────────────────────────────────────
-# ONBOARDING — Nueva Empresa + Primer Admin (Super Admin only)
-# ──────────────────────────────────────────────
-
-@app.get("/saas-master/nueva", response_class=HTMLResponse)
-async def nueva_empresa_form(
-    request: Request,
-    db: Session = Depends(get_db),
-    user: Usuario = Depends(require_super_admin)
-):
-    """Formulario para crear una nueva empresa (tenant) con su primer admin."""
-    return templates.TemplateResponse(request=request, name="saas_nueva_empresa.html", context={
-        "request": request,
-        "user": user,
-        "error": None,
-    })
-
-@app.post("/saas-master/nueva", response_class=HTMLResponse)
-async def nueva_empresa_crear(
-    request: Request,
-    db: Session = Depends(get_db),
-    user: Usuario = Depends(require_super_admin),
-    nombre: str = Form(...),
-    rut: str = Form(...),
-    plan: str = Form("basic"),
-    nombre_comercial: str = Form(""),
-    color_primario: str = Form("#1a1a2e"),
-    color_secundario: str = Form("#16213e"),
-    admin_nombre: str = Form(...),
-    admin_email: str = Form(...),
-):
-    """Crea una nueva Empresa + su primer Usuario ADMIN en una transacción atómica."""
-    # Validaciones básicas
-    if not nombre.strip() or not rut.strip() or not admin_email.strip():
-        return templates.TemplateResponse(request=request, name="saas_nueva_empresa.html", context={
-            "request": request, "user": user,
-            "error": "Nombre, RUT y email del administrador son obligatorios.",
-        })
-    if plan not in ("basic", "pro", "enterprise"):
-        plan = "basic"
-
-    # Verificar unicidad
-    if db.query(Empresa).filter(Empresa.rut == rut.strip()).first():
-        return templates.TemplateResponse(request=request, name="saas_nueva_empresa.html", context={
-            "request": request, "user": user,
-            "error": f"El RUT '{rut.strip()}' ya está registrado.",
-        })
-    if db.query(Usuario).filter(Usuario.email == admin_email.strip()).first():
-        return templates.TemplateResponse(request=request, name="saas_nueva_empresa.html", context={
-            "request": request, "user": user,
-            "error": f"El email '{admin_email.strip()}' ya está en uso.",
-        })
-
-    # ── Transacción atómica ──
-    try:
-        # 1. Crear Empresa
-        empresa = Empresa(
-            nombre=nombre.strip(),
-            rut=rut.strip(),
-            plan=plan,
-            activa=True,
-            nombre_comercial=nombre_comercial.strip() or nombre.strip(),
-            color_primario=color_primario.strip() or "#1a1a2e",
-            color_secundario=color_secundario.strip() or "#16213e",
-        )
-        db.add(empresa)
-        db.flush()  # obtener empresa.id
-
-        # 2. Contraseña temporal (hasheada)
-        temp_password = "Bienvenido123!"
-        pwd_hash = get_password_hash(temp_password)
-
-        # 3. Crear Usuario ADMIN de esa empresa
-        admin = Usuario(
-            nombre_completo=admin_nombre.strip(),
-            email=admin_email.strip(),
-            password_hash=pwd_hash,
-            rol=RolUsuario.ADMINISTRADOR,
-            empresa_id=empresa.id,
-            sucursal_id=None,
-            activo=True,
-        )
-        db.add(admin)
-        db.flush()
-
-        # 4. Crear sucursal por defecto (nombre único por empresa)
-        sucursal = Sucursal(
-            nombre=f"Principal - {empresa.nombre_comercial or empresa.nombre}",
-            direccion="Por definir",
-            empresa_id=empresa.id,
-            activa=True
-        )
-        db.add(sucursal)
-        db.flush()
-        admin.sucursal_id = sucursal.id
-
-        db.commit()
-
-        return templates.TemplateResponse(request=request, name="saas_nueva_empresa.html", context={
-            "request": request, "user": user,
-            "exito": {
-                "empresa": empresa.nombre_comercial or empresa.nombre,
-                "admin_email": admin.email,
-                "password_temp": temp_password,
-            },
-        })
-
-    except Exception as e:
-        db.rollback()
-        return templates.TemplateResponse(request=request, name="saas_nueva_empresa.html", context={
-            "request": request, "user": user,
-            "error": f"Error al crear la empresa: {str(e)}",
-        })
-
-@app.get("/", response_class=HTMLResponse)
-async def dashboard(request: Request, db: Session = Depends(get_db), user: Usuario = Depends(require_auth),
-                    sucursal_id: int = None):
-    # Verificar stock crítico y notificar
-    await notificar_stock_critico(db)
-
-    es_admin = user.rol == RolUsuario.ADMINISTRADOR
-    sucursales = []
-    if es_admin:
-        sucursales = db.query(Sucursal).filter(Sucursal.activa == True).order_by(Sucursal.nombre).all()
-
-    # Si no es admin, fuerza sucursal global (None) — solo el Admin filtra multi-sucursal
-    if not es_admin:
-        sucursal_id = None
-
-    stats = calculate_dashboard_stats(db, sucursal_id)
-
-    # Subconsulta de usuarios de la sucursal para filtrar listas recientes
-    usuarios_subq = None
-    if sucursal_id:
-        usuarios_subq = db.query(Usuario.id).filter(Usuario.sucursal_id == sucursal_id).scalar_subquery()
-
-    ultimas_compras_q = db.query(RegistroCompra).options(
-        joinedload(RegistroCompra.proveedor)
-    )
-    if usuarios_subq is not None:
-        ultimas_compras_q = ultimas_compras_q.filter(RegistroCompra.creado_por_usuario_id.in_(usuarios_subq))
-    ultimas_compras = ultimas_compras_q.order_by(desc(RegistroCompra.fecha_registro)).limit(5).all()
-
-    ultimas_mermas_q = db.query(RegistroMerma).options(
-        joinedload(RegistroMerma.ingrediente)
-    )
-    if usuarios_subq is not None:
-        ultimas_mermas_q = ultimas_mermas_q.filter(RegistroMerma.responsable_usuario_id.in_(usuarios_subq))
-    ultimas_mermas = ultimas_mermas_q.order_by(desc(RegistroMerma.fecha_registro)).limit(5).all()
-
-    # FILTRO MULTI-TENANT: ingredientes críticos
-    tenant_id = tenant_context.get()
-    ingredientes_criticos_q = db.query(IngredienteStock).filter(
-        IngredienteStock.activo == True,
-        IngredienteStock.stock_actual <= IngredienteStock.stock_minimo
-    )
-    if tenant_id is not None:
-        ingredientes_criticos_q = ingredientes_criticos_q.filter(IngredienteStock.empresa_id == tenant_id)
-    ingredientes_criticos = ingredientes_criticos_q.order_by(IngredienteStock.stock_actual.asc()).limit(10).all()
-
-    # FILTRO MULTI-TENANT: temperaturas recientes
-    temps_recientes_q = db.query(RegistroTemperatura).order_by(
-        desc(RegistroTemperatura.fecha_registro)
-    )
-    if tenant_id is not None:
-        temps_recientes_q = temps_recientes_q.filter(RegistroTemperatura.empresa_id == tenant_id)
-    temps_recientes = temps_recientes_q.limit(10).all()
-
-    # Notificaciones no leídas del usuario
-    notificaciones = db.query(Notificacion).filter(
-        Notificacion.usuario_id == user.id,
-        Notificacion.leida == False
-    ).order_by(desc(Notificacion.fecha_creacion)).limit(5).all()
-
-    return templates.TemplateResponse(request=request, name="dashboard.html", context={
-        "request": request,
-        "user": user,
-        "stats": stats,
-        "ultimas_compras": ultimas_compras,
-        "ultimas_mermas": ultimas_mermas,
-        "ingredientes_criticos": ingredientes_criticos,
-        "temps_recientes": temps_recientes,
-        "notificaciones": notificaciones,
-        "sucursales": sucursales,
-        "sucursal_seleccionada": sucursal_id,
-        "es_admin": es_admin,
-        "today": date.today(),
-    })
-# ──────────────────────────────────────────────
-# PROVEEDORES - CRUD COMPLETO
-# ──────────────────────────────────────────────
-
-@app.get("/proveedores", response_class=HTMLResponse)
-async def list_proveedores(request: Request, db: Session = Depends(get_db),
-                           search: str = "", sucursal_id: int = None, page: int = 1, per_page: int = 20):
-    query = db.query(Proveedor)
-    if search:
-        query = query.filter(Proveedor.nombre.ilike(f"%{search}%"))
-    
-    total = query.count()
-    proveedores = query.order_by(Proveedor.nombre).offset((page - 1) * per_page).limit(per_page).all()
-    
-    return templates.TemplateResponse(request=request, name="proveedores/list.html", context={
-        "request": request,
-        "proveedores": proveedores,
-        "search": search,
-        "page": page,
-        "per_page": per_page,
-        "total": total,
-        "total_pages": (total + per_page - 1) // per_page,
-        "sucursal_id": sucursal_id,
-    })
-
-@app.get("/proveedores/nuevo", response_class=HTMLResponse)
-async def new_proveedor_form(request: Request):
-    return templates.TemplateResponse(request=request, name="proveedores/form.html", context={
-        "request": request,
-        "proveedor": None,
-        "action": "/proveedores/nuevo",
-        "title": "Nuevo Proveedor"
-    })
-
-@app.post("/proveedores/nuevo")
-async def create_proveedor(
-    request: Request,
-    db: Session = Depends(get_db),
-    nombre: str = Form(...),
-    contacto: str = Form(""),
-    telefono: str = Form(""),
-    email: str = Form(""),
-    direccion: str = Form(""),
-    activo: bool = Form(False),
-):
-    proveedor = Proveedor(
-        nombre=nombre,
-        contacto=contacto or None,
-        telefono=telefono or None,
-        email=email or None,
-        direccion=direccion or None,
-        activo=activo
-    )
-    db.add(proveedor)
-    db.commit()
-    return RedirectResponse(url="/proveedores", status_code=303)
-
-@app.get("/proveedores/{proveedor_id}/editar", response_class=HTMLResponse)
-async def edit_proveedor_form(request: Request, proveedor_id: int, db: Session = Depends(get_db)):
-    proveedor = db.query(Proveedor).filter(Proveedor.id == proveedor_id).first()
-    if not proveedor:
-        raise HTTPException(status_code=404, detail="Proveedor no encontrado")
-    
-    return templates.TemplateResponse(request=request, name="proveedores/form.html", context={
-        "request": request,
-        "proveedor": proveedor,
-        "action": f"/proveedores/{proveedor_id}/editar",
-        "title": "Editar Proveedor"
-    })
-
-@app.post("/proveedores/{proveedor_id}/editar")
-async def update_proveedor(
-    proveedor_id: int,
-    db: Session = Depends(get_db),
-    nombre: str = Form(...),
-    contacto: str = Form(""),
-    telefono: str = Form(""),
-    email: str = Form(""),
-    direccion: str = Form(""),
-    activo: bool = Form(False),
-):
-    proveedor = db.query(Proveedor).filter(Proveedor.id == proveedor_id).first()
-    if not proveedor:
-        raise HTTPException(status_code=404, detail="Proveedor no encontrado")
-    
-    proveedor.nombre = nombre
-    proveedor.contacto = contacto or None
-    proveedor.telefono = telefono or None
-    proveedor.email = email or None
-    proveedor.direccion = direccion or None
-    proveedor.activo = activo
-    proveedor.updated_at = func.now()
-    
-    db.commit()
-    return RedirectResponse(url="/proveedores", status_code=303)
-
-@app.post("/proveedores/{proveedor_id}/eliminar")
-async def delete_proveedor(proveedor_id: int, db: Session = Depends(get_db)):
-    proveedor = db.query(Proveedor).filter(Proveedor.id == proveedor_id).first()
-    if not proveedor:
-        raise HTTPException(status_code=404, detail="Proveedor no encontrado")
-    
-    # Verificar si tiene compras asociadas
-    if proveedor.compras:
-        raise HTTPException(status_code=400, detail="No se puede eliminar: tiene compras asociadas")
-    
-    db.delete(proveedor)
-    db.commit()
-    return RedirectResponse(url="/proveedores", status_code=303)
-
-# ──────────────────────────────────────────────
-# HIGIENE PERSONAL - CRUD
-# ──────────────────────────────────────────────
-
-@app.get("/higiene", response_class=HTMLResponse)
-async def list_higiene(request: Request, db: Session = Depends(get_db),
-                       page: int = 1, per_page: int = 20):
-    query = db.query(HigienePersonal)
-    
-    total = query.count()
-    auditorias = query.order_by(desc(HigienePersonal.fecha_registro)).offset((page - 1) * per_page).limit(per_page).all()
-    
-    # Estadísticas
-    total_mes = db.query(HigienePersonal).filter(
-        HigienePersonal.fecha_auditoria >= date.today().replace(day=1)
-    ).count()
-    
-    aprobados_mes = db.query(HigienePersonal).filter(
-        HigienePersonal.fecha_auditoria >= date.today().replace(day=1),
-        HigienePersonal.aprobado == True
-    ).count()
-    
-    return templates.TemplateResponse(request=request, name="higiene/list.html", context={
-        "request": request,
-        "auditorias": auditorias,
-        "page": page,
-        "per_page": per_page,
-        "total": total,
-        "total_pages": (total + per_page - 1) // per_page,
-        "total_mes": total_mes,
-        "aprobados_mes": aprobados_mes,
-        "porcentaje": round((aprobados_mes / total_mes * 100) if total_mes > 0 else 0, 1),
-    })
-
-
-@app.get("/higiene/nueva", response_class=HTMLResponse)
-async def new_higiene_form(request: Request):
-    return templates.TemplateResponse(request=request, name="higiene/form.html", context={
-        "request": request,
-        "auditoria": None,
-        "action": "/higiene/nueva",
-        "title": "Nueva Auditoría de Higiene",
-        "today": date.today().isoformat(),
-        "now": datetime.now().time().isoformat()[:5],
-    })
-
-
-@app.post("/higiene/nueva")
-async def create_higiene(
-    request: Request,
-    db: Session = Depends(get_db),
-    empleado_nombre: str = Form(...),
-    empleado_cargo: str = Form(""),
-    fecha_auditoria: str = Form(...),
-    hora_auditoria: str = Form(...),
-    auditor_nombre: str = Form(...),
-    auditor_firma: str = Form(""),
-    uñas_cortas_limpias: bool = Form(False),
-    manos_limpias: bool = Form(False),
-    sin_joyas: bool = Form(False),
-    uniforme_limpio: bool = Form(False),
-    cabello_cubierto: bool = Form(False),
-    calzado_adecuado: bool = Form(False),
-    sin_lesiones_visibles: bool = Form(False),
-    lavado_manos_correcto: bool = Form(False),
-    observaciones: str = Form(""),
-):
-    # Cálculo automático de aprobado (todos los criterios deben ser True)
-    criterios = [
-        uñas_cortas_limpias, manos_limpias, sin_joyas,
-        uniforme_limpio, cabello_cubierto, calzado_adecuado,
-        sin_lesiones_visibles, lavado_manos_correcto
-    ]
-    aprobado = all(criterios)
-    
-    auditoria = HigienePersonal(
-        empleado_nombre=empleado_nombre,
-        empleado_cargo=empleado_cargo or None,
-        fecha_auditoria=datetime.strptime(fecha_auditoria, "%Y-%m-%d").date(),
-        hora_auditoria=datetime.strptime(hora_auditoria, "%H:%M").time(),
-        auditor_nombre=auditor_nombre,
-        auditor_firma=auditor_firma or None,
-        uñas_cortas_limpias=uñas_cortas_limpias,
-        manos_limpias=manos_limpias,
-        sin_joyas=sin_joyas,
-        uniforme_limpio=uniforme_limpio,
-        cabello_cubierto=cabello_cubierto,
-        calzado_adecuado=calzado_adecuado,
-        sin_lesiones_visibles=sin_lesiones_visibles,
-        lavado_manos_correcto=lavado_manos_correcto,
-        aprobado=aprobado,
-        observaciones=observaciones or None,
-    )
-    db.add(auditoria)
-    db.commit()
-    return RedirectResponse(url="/higiene", status_code=303)
-
-
-@app.get("/higiene/{auditoria_id}/editar", response_class=HTMLResponse)
-async def edit_higiene_form(request: Request, auditoria_id: int, db: Session = Depends(get_db)):
-    auditoria = db.query(HigienePersonal).filter(HigienePersonal.id == auditoria_id).first()
-    if not auditoria:
-        raise HTTPException(status_code=404, detail="Auditoría no encontrada")
-    
-    return templates.TemplateResponse(request=request, name="higiene/form.html", context={
-        "request": request,
-        "auditoria": auditoria,
-        "action": f"/higiene/{auditoria_id}/editar",
-        "title": "Editar Auditoría de Higiene",
-    })
-
-
-@app.post("/higiene/{auditoria_id}/editar")
-async def update_higiene(
-    auditoria_id: int,
-    db: Session = Depends(get_db),
-    empleado_nombre: str = Form(...),
-    empleado_cargo: str = Form(""),
-    fecha_auditoria: str = Form(...),
-    hora_auditoria: str = Form(...),
-    auditor_nombre: str = Form(...),
-    auditor_firma: str = Form(""),
-    uñas_cortas_limpias: bool = Form(False),
-    manos_limpias: bool = Form(False),
-    sin_joyas: bool = Form(False),
-    uniforme_limpio: bool = Form(False),
-    cabello_cubierto: bool = Form(False),
-    calzado_adecuado: bool = Form(False),
-    sin_lesiones_visibles: bool = Form(False),
-    lavado_manos_correcto: bool = Form(False),
-    observaciones: str = Form(""),
-):
-    auditoria = db.query(HigienePersonal).filter(HigienePersonal.id == auditoria_id).first()
-    if not auditoria:
-        raise HTTPException(status_code=404, detail="Auditoría no encontrada")
-    
-    criterios = [
-        uñas_cortas_limpias, manos_limpias, sin_joyas,
-        uniforme_limpio, cabello_cubierto, calzado_adecuado,
-        sin_lesiones_visibles, lavado_manos_correcto
-    ]
-    aprobado = all(criterios)
-    
-    auditoria.empleado_nombre = empleado_nombre
-    auditoria.empleado_cargo = empleado_cargo or None
-    auditoria.fecha_auditoria = datetime.strptime(fecha_auditoria, "%Y-%m-%d").date()
-    auditoria.hora_auditoria = datetime.strptime(hora_auditoria, "%H:%M").time()
-    auditoria.auditor_nombre = auditor_nombre
-    auditoria.auditor_firma = auditor_firma or None
-    auditoria.uñas_cortas_limpias = uñas_cortas_limpias
-    auditoria.manos_limpias = manos_limpias
-    auditoria.sin_joyas = sin_joyas
-    auditoria.uniforme_limpio = uniforme_limpio
-    auditoria.cabello_cubierto = cabello_cubierto
-    auditoria.calzado_adecuado = calzado_adecuado
-    auditoria.sin_lesiones_visibles = sin_lesiones_visibles
-    auditoria.lavado_manos_correcto = lavado_manos_correcto
-    auditoria.aprobado = aprobado
-    auditoria.observaciones = observaciones or None
-    
-    db.commit()
-    return RedirectResponse(url="/higiene", status_code=303)
-
-
-# ──────────────────────────────────────────────
-# REGISTRO DE TEMPERATURAS - CRUD
-# ──────────────────────────────────────────────
-
-@app.get("/temperaturas", response_class=HTMLResponse)
-async def list_temperaturas(request: Request, db: Session = Depends(get_db),
-                            equipo: str = "", page: int = 1, per_page: int = 30):
-    query = db.query(RegistroTemperatura)
-    
-    if equipo:
-        query = query.filter(RegistroTemperatura.equipo_nombre.ilike(f"%{equipo}%"))
-    
-    total = query.count()
-    registros = query.order_by(desc(RegistroTemperatura.fecha_registro)).offset((page - 1) * per_page).limit(per_page).all()
-    
-    # Equipos únicos para filtro
-    equipos = db.query(RegistroTemperatura.equipo_nombre).distinct().all()
-    equipos = [e[0] for e in equipos]
-    
-    # Alertas de hoy
-    hoy = date.today()
-    alertas_hoy = db.query(RegistroTemperatura).filter(
-        RegistroTemperatura.fecha_medicion == hoy,
-        RegistroTemperatura.dentro_rango == False
-    ).count()
-    
-    return templates.TemplateResponse(request=request, name="temperaturas/list.html", context={
-        "request": request,
-        "registros": registros,
-        "equipos": equipos,
-        "equipo_filter": equipo,
-        "page": page,
-        "per_page": per_page,
-        "total": total,
-        "total_pages": (total + per_page - 1) // per_page,
-        "alertas_hoy": alertas_hoy,
-        "today": hoy,
-    })
-
-
-@app.get("/temperaturas/nueva", response_class=HTMLResponse)
-async def new_temperatura_form(request: Request, db: Session = Depends(get_db)):
-    # Obtener equipos registrados para sugerencia
-    equipos = db.query(RegistroTemperatura.equipo_nombre).distinct().all()
-    equipos = [e[0] for e in equipos]
-    
-    return templates.TemplateResponse(request=request, name="temperaturas/form.html", context={
-        "request": request,
-        "registro": None,
-        "equipos": equipos,
-        "action": "/temperaturas/nueva",
-        "title": "Registrar Temperatura",
-        "today": date.today().isoformat(),
-        "now": datetime.now().time().isoformat()[:5],
-    })
-
-
-@app.post("/temperaturas/nueva")
-async def create_temperatura(
-    request: Request,
-    db: Session = Depends(get_db),
-    equipo_nombre: str = Form(...),
-    equipo_ubicacion: str = Form(""),
-    temperatura: float = Form(...),
-    temperatura_objetivo_min: float = Form(0.0),
-    temperatura_objetivo_max: float = Form(4.0),
-    fecha_medicion: str = Form(...),
-    hora_medicion: str = Form(...),
-    responsable: str = Form(...),
-    responsable_firma: str = Form(""),
-    observaciones: str = Form(""),
-):
-    dentro_rango = temperatura_objetivo_min <= temperatura <= temperatura_objetivo_max
-    
-    registro = RegistroTemperatura(
-        equipo_nombre=equipo_nombre,
-        equipo_ubicacion=equipo_ubicacion or None,
-        temperatura=temperatura,
-        temperatura_objetivo_min=temperatura_objetivo_min,
-        temperatura_objetivo_max=temperatura_objetivo_max,
-        fecha_medicion=datetime.strptime(fecha_medicion, "%Y-%m-%d").date(),
-        hora_medicion=datetime.strptime(hora_medicion, "%H:%M").time(),
-        responsable=responsable,
-        responsable_firma=responsable_firma or None,
-        dentro_rango=dentro_rango,
-        observaciones=observaciones or None,
-    )
-    db.add(registro)
-    db.commit()
-    return RedirectResponse(url="/temperaturas", status_code=303)
-
-
-@app.get("/temperaturas/{registro_id}/editar", response_class=HTMLResponse)
-async def edit_temperatura_form(request: Request, registro_id: int, db: Session = Depends(get_db)):
-    registro = db.query(RegistroTemperatura).filter(RegistroTemperatura.id == registro_id).first()
-    if not registro:
-        raise HTTPException(status_code=404, detail="Registro no encontrado")
-    
-    equipos = db.query(RegistroTemperatura.equipo_nombre).distinct().all()
-    equipos = [e[0] for e in equipos]
-    
-    return templates.TemplateResponse(request=request, name="temperaturas/form.html", context={
-        "request": request,
-        "registro": registro,
-        "equipos": equipos,
-        "action": f"/temperaturas/{registro_id}/editar",
-        "title": "Editar Registro de Temperatura",
-    })
-
-
-@app.post("/temperaturas/{registro_id}/editar")
-async def update_temperatura(
-    registro_id: int,
-    db: Session = Depends(get_db),
-    equipo_nombre: str = Form(...),
-    equipo_ubicacion: str = Form(""),
-    temperatura: float = Form(...),
-    temperatura_objetivo_min: float = Form(...),
-    temperatura_objetivo_max: float = Form(...),
-    fecha_medicion: str = Form(...),
-    hora_medicion: str = Form(...),
-    responsable: str = Form(...),
-    responsable_firma: str = Form(""),
-    observaciones: str = Form(""),
-):
-    registro = db.query(RegistroTemperatura).filter(RegistroTemperatura.id == registro_id).first()
-    if not registro:
-        raise HTTPException(status_code=404, detail="Registro no encontrado")
-    
-    dentro_rango = temperatura_objetivo_min <= temperatura <= temperatura_objetivo_max
-    
-    registro.equipo_nombre = equipo_nombre
-    registro.equipo_ubicacion = equipo_ubicacion or None
-    registro.temperatura = temperatura
-    registro.temperatura_objetivo_min = temperatura_objetivo_min
-    registro.temperatura_objetivo_max = temperatura_objetivo_max
-    registro.fecha_medicion = datetime.strptime(fecha_medicion, "%Y-%m-%d").date()
-    registro.hora_medicion = datetime.strptime(hora_medicion, "%H:%M").time()
-    registro.responsable = responsable
-    registro.responsable_firma = responsable_firma or None
-    registro.dentro_rango = dentro_rango
-    registro.observaciones = observaciones or None
-    
-    db.commit()
-    return RedirectResponse(url="/temperaturas", status_code=303)
-
-
-# ──────────────────────────────────────────────
-# API ENDPOINTS (para futuras integraciones)
-# ──────────────────────────────────────────────
+@app.get("/api/dashboard/stats")
+async def api_dashboard_stats(db: Session = Depends(get_db), user: Usuario = Depends(require_auth), sucursal_id: int = None):
+    return calculate_dashboard_stats(db, sucursal_id)
 
 @app.get("/api/stock/critico")
-async def api_stock_critico(db: Session = Depends(get_db)):
-    """API: Ingredientes con stock bajo mínimo"""
+async def api_stock_critico(db: Session = Depends(get_db), user: Usuario = Depends(require_auth)):
     items = db.query(IngredienteStock).filter(
         IngredienteStock.activo == True,
         IngredienteStock.stock_actual <= IngredienteStock.stock_minimo
@@ -1319,16 +540,8 @@ async def api_stock_critico(db: Session = Depends(get_db)):
         "categoria": i.categoria.value
     } for i in items]
 
-
-@app.get("/api/dashboard/stats")
-async def api_dashboard_stats(db: Session = Depends(get_db)):
-    """API: Estadísticas del dashboard"""
-    return calculate_dashboard_stats(db)
-
-
 @app.get("/api/temperaturas/alertas")
-async def api_temp_alertas(db: Session = Depends(get_db)):
-    """API: Temperaturas fuera de rango hoy"""
+async def api_temp_alertas(db: Session = Depends(get_db), user: Usuario = Depends(require_auth)):
     hoy = date.today()
     alertas = db.query(RegistroTemperatura).filter(
         RegistroTemperatura.fecha_medicion == hoy,
@@ -1344,1521 +557,17 @@ async def api_temp_alertas(db: Session = Depends(get_db)):
         "responsable": a.responsable
     } for a in alertas]
 
-
 # ──────────────────────────────────────────────
-# REQUERIMIENTOS - CRUD COMPLETO (Fase 2)
-# ──────────────────────────────────────────────
-
-@app.get("/requerimientos", response_class=HTMLResponse)
-async def list_requerimientos(request: Request, db: Session = Depends(get_db), user: Usuario = Depends(get_encargado_user)):
-    """
-    Lista todos los requerimientos y calcula el total proyectado.
-    Solo accesible para ENCARGADO y ADMINISTRADOR.
-    """
-    requerimientos = db.query(Requerimientos).order_by(Requerimientos.fecha_registro.desc()).all()
-    total_proyectado = sum(r.cantidad * r.precio_estimado for r in requerimientos)
-    # Obtener lista de sucursales para el formulario (solo activas)
-    sucursales = db.query(Sucursal).filter(Sucursal.activa == True).order_by(Sucursal.nombre).all()
-    # Productos del inventario real para el selector dinámico (evita errores de tipeo)
-    productos_inventario = db.query(IngredienteStock).filter(
-        IngredienteStock.activo == True
-    ).order_by(IngredienteStock.nombre).all()
-    return templates.TemplateResponse(request=request, name="requerimientos.html", context={
-        "request": request,
-        "user": user,
-        "requerimientos": requerimientos,
-        "total_proyectado": total_proyectado,
-        "sucursales": sucursales,
-        "productos_inventario": productos_inventario
-    })
-
-@app.post("/requerimientos")
-async def create_requerimiento(
-    request: Request,
-    db: Session = Depends(get_db),
-    user: Usuario = Depends(require_encargado_or_admin),
-    producto: str = Form(...),
-    cantidad: float = Form(...),
-    precio_estimado: float = Form(...),
-    prioridad: str = Form(...),
-    sucursal_id: int = Form(...)
-):
-    """
-    Crea un nuevo requerimiento y envía notificación de Telegram.
-    """
-    # Validar que la sucursal existe y está activa
-    sucursal = db.query(Sucursal).filter(Sucursal.id == sucursal_id, Sucursal.activa == True).first()
-    if not sucursal:
-        raise HTTPException(status_code=404, detail="Sucursal no encontrada o inactiva")
-    # Validar prioridad
-    try:
-        prioridad_enum = Prioridad(prioridad)
-    except ValueError:
-        raise HTTPException(status_code=400, detail="Prioridad inválida")
-    # Crear el objeto requerimiento
-    requerimiento = Requerimientos(
-        producto=producto,
-        cantidad=cantidad,
-        precio_estimado=precio_estimado,
-        prioridad=prioridad_enum,
-        sucursal_id=sucursal_id
-    )
-    db.add(requerimiento)
-    db.commit()
-    db.refresh(requerimiento)
-    # Preparar mensaje de Telegram
-    total = cantidad * precio_estimado
-    mensaje = f"🚨 NUEVO REQUERIMIENTO ({prioridad}): {cantidad}x {producto} - Total: ${total:.2f}"
-    # Enviar notificación (no bloqueante, pero esperamos por si falla)
-    try:
-        await enviar_alerta_telegram(mensaje)
-    except Exception:
-        # No fallamos la creación si falla Telegram
-        pass
-    # Redirigir de vuelta a la lista con mensaje de éxito
-    return RedirectResponse(url="/requerimientos?ok=1", status_code=status.HTTP_303_SEE_OTHER)
-
-
-
-
-# ──────────────────────────────────────────────
-# FASE 3: INVENTARIO FÍSICO
+# HEALTH CHECK
 # ──────────────────────────────────────────────
 
 @app.get("/health")
 async def health_check():
-    return {"status": "ok", "service": "ERP Gastronómico", "version": "2.1.0"}
-
-
-# ──────────────────────────────────────────────
-# INVENTARIO + MERMAS 2.0 — Vista unificada
-# ──────────────────────────────────────────────
-
-@app.get("/inventario-mermas", response_class=HTMLResponse)
-async def inventario_mermas(
-    request: Request,
-    db: Session = Depends(get_db),
-    user: Usuario = Depends(require_auth),
-):
-    """Vista unificada: Stock por sucursal + Mermas + Formulario nueva merma"""
-    # Stock por sucursal (filtrado por tenant automático)
-    stock_sucursales = db.query(StockSucursal).options(
-        joinedload(StockSucursal.ingrediente),
-        joinedload(StockSucursal.sucursal)
-    ).order_by(StockSucursal.ingrediente_id, StockSucursal.sucursal_id).all()
-    
-    # Mermas recientes (filtrado por tenant)
-    mermas = db.query(RegistroMerma).options(
-        joinedload(RegistroMerma.ingrediente),
-        joinedload(RegistroMerma.sucursal),
-        joinedload(RegistroMerma.responsable_usuario)
-    ).order_by(desc(RegistroMerma.fecha_registro)).limit(50).all()
-    
-    # Ingredientes activos para el formulario
-    ingredientes = db.query(IngredienteStock).filter(
-        IngredienteStock.activo == True,
-        IngredienteStock.empresa_id == user.empresa_id
-    ).order_by(IngredienteStock.nombre).all()
-    
-    return templates.TemplateResponse(request=request, name="inventario_mermas.html", context={
-        "request": request,
-        "user": user,
-        "stock_sucursales": stock_sucursales,
-        "mermas": mermas,
-        "ingredientes": ingredientes,
-        "tipos": list(TipoMerma),
-        "today": date.today().isoformat(),
-        "now": datetime.now().time().isoformat()[:5],
-    })
-
+    return {"status": "ok", "service": "ERP Gastronómico API", "version": "3.0.0"}
 
 # ──────────────────────────────────────────────
-# MERMAS - CRUD + LÓGICA INVENTARIO
+# ENTRY POINT
 # ──────────────────────────────────────────────
-
-@app.get("/mermas", response_class=HTMLResponse)
-async def list_mermas(request: Request, db: Session = Depends(get_db),
-                      tipo: str = "", estado: str = "", sucursal_id: int = None, page: int = 1, per_page: int = 20):
-    query = db.query(RegistroMerma).options(joinedload(RegistroMerma.ingrediente))
-    
-    if tipo:
-        query = query.filter(RegistroMerma.tipo == TipoMerma(tipo))
-    if estado:
-        query = query.filter(RegistroMerma.estado == EstadoAprobacion(estado))
-    # Filtro por sucursal (el registro de merma tiene sucursal_id directo)
-    if sucursal_id:
-        query = query.filter(RegistroMerma.sucursal_id == sucursal_id)
-    
-    total = query.count()
-    mermas = query.order_by(desc(RegistroMerma.fecha_registro)).offset((page - 1) * per_page).limit(per_page).all()
-    
-    return templates.TemplateResponse(request=request, name="mermas/list.html", context={
-        "request": request,
-        "mermas": mermas,
-        "tipos": list(TipoMerma),
-        "estados": list(EstadoAprobacion),
-        "tipo_filter": tipo,
-        "estado_filter": estado,
-        "page": page,
-        "per_page": per_page,
-        "total": total,
-        "total_pages": (total + per_page - 1) // per_page,
-        "sucursal_id": sucursal_id,
-    })
-
-
-@app.get("/mermas/nueva", response_class=HTMLResponse)
-async def new_merma_form(request: Request, db: Session = Depends(get_db)):
-    ingredientes = db.query(IngredienteStock).filter(IngredienteStock.activo == True).order_by(IngredienteStock.nombre).all()
-    
-    return templates.TemplateResponse(request=request, name="mermas/form.html", context={
-        "request": request,
-        "merma": None,
-        "ingredientes": ingredientes,
-        "tipos": list(TipoMerma),
-        "action": "/mermas/nueva",
-        "title": "Registrar Merma",
-        "today": date.today().isoformat(),
-        "now": datetime.now().time().isoformat()[:5],
-    })
-
-
-@app.post("/mermas/nueva")
-async def create_merma(
-    request: Request,
-    db: Session = Depends(get_db),
-    user: Usuario = Depends(require_auth),
-    ingrediente_id: int = Form(...),
-    tipo: str = Form(...),
-    cantidad: float = Form(...),
-    fecha_merma: str = Form(...),
-    observaciones: str = Form(""),
-):
-    ingrediente = db.query(IngredienteStock).filter(IngredienteStock.id == ingrediente_id).first()
-    if not ingrediente:
-        raise HTTPException(status_code=404, detail="Ingrediente no encontrado")
-    
-    # Obtener stock en la sucursal del usuario
-    stock_suc = None
-    if user.sucursal_id:
-        stock_suc = db.query(StockSucursal).filter(
-            StockSucursal.ingrediente_id == ingrediente_id,
-            StockSucursal.sucursal_id == user.sucursal_id,
-            StockSucursal.empresa_id == user.empresa_id
-        ).first()
-        stock_disponible = stock_suc.stock_actual if stock_suc else 0
-    else:
-        # Usuario sin sucursal asignada: usa stock global
-        stock_disponible = ingrediente.stock_actual
-    
-    if stock_disponible < cantidad:
-        raise HTTPException(status_code=400, detail=f"Stock insuficiente en sucursal. Disponible: {stock_disponible}")
-    
-    valor_perdida = cantidad * ingrediente.costo_promedio
-    
-    merma = RegistroMerma(
-        sucursal_id=user.sucursal_id,
-        ingrediente_id=ingrediente_id,
-        tipo=TipoMerma(tipo),
-        cantidad=cantidad,
-        valor_perdida=valor_perdida,
-        fecha_merma=datetime.strptime(fecha_merma, "%Y-%m-%d").date(),
-        responsable_usuario_id=user.id,
-        observaciones=observaciones or None,
-        estado=EstadoAprobacion.PENDIENTE,
-        empresa_id=user.empresa_id,
-    )
-    db.add(merma)
-    db.flush()
-    
-    # Notificación Telegram
-    message = f"🚨 Nueva Merma Registrada: {cantidad} de {ingrediente.nombre}"
-    await enviar_alerta_telegram(message)
-    
-    db.commit()
-    return RedirectResponse(url="/mermas", status_code=303)
-
-
-@app.post("/mermas/{merma_id}/aprobar")
-async def aprobar_merma(
-    merma_id: int,
-    request: Request,
-    db: Session = Depends(get_db),
-    user: Usuario = Depends(require_encargado_or_admin),
-):
-    merma = db.query(RegistroMerma).options(joinedload(RegistroMerma.ingrediente)).filter(RegistroMerma.id == merma_id).first()
-    if not merma:
-        raise HTTPException(status_code=404, detail="Merma no encontrada")
-    
-    if merma.estado == EstadoAprobacion.APROBADO:
-        raise HTTPException(status_code=400, detail="Ya está aprobada")
-    
-    # Descontar stock de la sucursal correspondiente
-    if merma.sucursal_id:
-        stock_suc = db.query(StockSucursal).filter(
-            StockSucursal.ingrediente_id == merma.ingrediente_id,
-            StockSucursal.sucursal_id == merma.sucursal_id,
-            StockSucursal.empresa_id == merma.empresa_id
-        ).first()
-        if stock_suc:
-            if stock_suc.stock_actual < merma.cantidad:
-                raise HTTPException(status_code=400, detail=f"Stock insuficiente en sucursal al aprobar. Disponible: {stock_suc.stock_actual}")
-            stock_suc.stock_actual -= merma.cantidad
-            stock_suc.ultima_actualizacion = func.now()
-        else:
-            # Crear registro de stock si no existe
-            stock_suc = StockSucursal(
-                empresa_id=merma.empresa_id,
-                sucursal_id=merma.sucursal_id,
-                ingrediente_id=merma.ingrediente_id,
-                stock_actual=0 - merma.cantidad,  # Negativo: indica deuda
-                stock_minimo=0,
-                ultima_actualizacion=func.now()
-            )
-            db.add(stock_suc)
-    else:
-        # Merma sin sucursal: descontar del stock global del ingrediente
-        ing = merma.ingrediente
-        if ing.stock_actual < merma.cantidad:
-            raise HTTPException(status_code=400, detail=f"Stock global insuficiente al aprobar. Disponible: {ing.stock_actual}")
-        ing.stock_actual -= merma.cantidad
-        ing.updated_at = func.now()
-    
-    merma.estado = EstadoAprobacion.APROBADO
-    merma.aprobado_por_usuario_id = user.id
-    merma.fecha_aprobacion = func.now()
-    
-    db.commit()
-    return RedirectResponse(url="/mermas", status_code=303)
-
-
-@app.post("/mermas/{merma_id}/rechazar")
-async def rechazar_merma(merma_id: int, db: Session = Depends(get_db),
-                         rechazado_por: str = Form(...)):
-    merma = db.query(RegistroMerma).filter(RegistroMerma.id == merma_id).first()
-    if not merma:
-        raise HTTPException(status_code=404, detail="Merma no encontrada")
-    
-    merma.estado = EstadoAprobacion.RECHAZADO
-    merma.aprobado_por = rechazado_por
-    merma.fecha_aprobacion = func.now()
-    
-    db.commit()
-    return RedirectResponse(url="/mermas", status_code=303)
-
-
-# ──────────────────────────────────────────────
-# GASTOS - CRUD
-# ──────────────────────────────────────────────
-
-@app.get("/gastos", response_class=HTMLResponse)
-async def list_gastos(request: Request, db: Session = Depends(get_db),
-                      tipo: str = "", estado: str = "", page: int = 1, per_page: int = 20):
-    query = db.query(ControlGasto)
-    
-    if tipo:
-        query = query.filter(ControlGasto.tipo == TipoGasto(tipo))
-    if estado:
-        query = query.filter(ControlGasto.estado == EstadoAprobacion(estado))
-    
-    total = query.count()
-    gastos = query.order_by(desc(ControlGasto.fecha_registro)).offset((page - 1) * per_page).limit(per_page).all()
-    
-    # Totales para el resumen
-    total_mes = db.query(func.sum(ControlGasto.monto)).filter(
-        ControlGasto.fecha_gasto >= date.today().replace(day=1)
-    ).scalar() or 0
-    
-    return templates.TemplateResponse(request=request, name="gastos/list.html", context={
-        "request": request,
-        "gastos": gastos,
-        "tipos": list(TipoGasto),
-        "estados": list(EstadoAprobacion),
-        "tipo_filter": tipo,
-        "estado_filter": estado,
-        "page": page,
-        "per_page": per_page,
-        "total": total,
-        "total_pages": (total + per_page - 1) // per_page,
-        "total_mes": round(total_mes, 2),
-    })
-
-
-@app.get("/gastos/nuevo", response_class=HTMLResponse)
-async def new_gasto_form(request: Request):
-    return templates.TemplateResponse(request=request, name="gastos/form.html", context={
-        "request": request,
-        "gasto": None,
-        "tipos": list(TipoGasto),
-        "action": "/gastos/nuevo",
-        "title": "Nuevo Gasto",
-        "today": date.today().isoformat(),
-    })
-
-
-@app.post("/gastos/nuevo")
-async def create_gasto(
-    request: Request,
-    db: Session = Depends(get_db),
-    tipo: str = Form(...),
-    descripcion: str = Form(...),
-    monto: float = Form(...),
-    fecha_gasto: str = Form(...),
-    proveedor: str = Form(""),
-    numero_comprobante: str = Form(""),
-    observaciones: str = Form(""),
-):
-    gasto = ControlGasto(
-        tipo=TipoGasto(tipo),
-        descripcion=descripcion,
-        monto=monto,
-        fecha_gasto=datetime.strptime(fecha_gasto, "%Y-%m-%d").date(),
-        proveedor=proveedor or None,
-        numero_comprobante=numero_comprobante or None,
-        observaciones=observaciones or None,
-        estado=EstadoAprobacion.PENDIENTE,
-    )
-    db.add(gasto)
-    db.commit()
-    return RedirectResponse(url="/gastos", status_code=303)
-
-
-@app.post("/gastos/{gasto_id}/aprobar")
-async def aprobar_gasto(gasto_id: int, db: Session = Depends(get_db),
-                        aprobado_por: str = Form(...)):
-    gasto = db.query(ControlGasto).filter(ControlGasto.id == gasto_id).first()
-    if not gasto:
-        raise HTTPException(status_code=404, detail="Gasto no encontrado")
-    
-    gasto.estado = EstadoAprobacion.APROBADO
-    gasto.aprobado_por = aprobado_por
-    gasto.fecha_aprobacion = func.now()
-    
-    db.commit()
-    return RedirectResponse(url="/gastos", status_code=303)
-
-
-@app.post("/gastos/{gasto_id}/rechazar")
-async def rechazar_gasto(gasto_id: int, db: Session = Depends(get_db),
-                         rechazado_por: str = Form(...)):
-    gasto = db.query(ControlGasto).filter(ControlGasto.id == gasto_id).first()
-    if not gasto:
-        raise HTTPException(status_code=404, detail="Gasto no encontrado")
-    
-    gasto.estado = EstadoAprobacion.RECHAZADO
-    gasto.aprobado_por = rechazado_por
-    gasto.fecha_aprobacion = func.now()
-    
-    db.commit()
-    return RedirectResponse(url="/gastos", status_code=303)
-
-
-# ──────────────────────────────────────────────
-# CHECKLIST DIARIO - APERTURA/CIERRE
-# ──────────────────────────────────────────────
-
-@app.get("/checklist", response_class=HTMLResponse)
-async def list_checklist(request: Request, db: Session = Depends(get_db),
-                         tipo: str = "", page: int = 1, per_page: int = 20):
-    query = db.query(ListaVerificacionDiario)
-    
-    if tipo:
-        query = query.filter(ListaVerificacionDiario.tipo == TipoChecklist(tipo))
-    
-    total = query.count()
-    checklists = query.order_by(desc(ListaVerificacionDiario.fecha_hora_completa)).offset((page - 1) * per_page).limit(per_page).all()
-    
-    # Verificar si ya hay apertura/cierre hoy
-    hoy = date.today()
-    apertura_hoy = db.query(ListaVerificacionDiario).filter(
-        ListaVerificacionDiario.fecha == hoy,
-        ListaVerificacionDiario.tipo == TipoChecklist.APERTURA
-    ).first()
-    
-    cierre_hoy = db.query(ListaVerificacionDiario).filter(
-        ListaVerificacionDiario.fecha == hoy,
-        ListaVerificacionDiario.tipo == TipoChecklist.CIERRE
-    ).first()
-    
-    return templates.TemplateResponse(request=request, name="checklist/list.html", context={
-        "request": request,
-        "checklists": checklists,
-        "tipos": list(TipoChecklist),
-        "tipo_filter": tipo,
-        "page": page,
-        "per_page": per_page,
-        "total": total,
-        "total_pages": (total + per_page - 1) // per_page,
-        "apertura_hoy": apertura_hoy,
-        "cierre_hoy": cierre_hoy,
-        "today": hoy,
-    })
-
-
-@app.get("/checklist/nuevo", response_class=HTMLResponse)
-async def new_checklist_form(request: Request, tipo: str = "APERTURA", db: Session = Depends(get_db)):
-    # Verificar si ya existe uno del mismo tipo hoy
-    hoy = date.today()
-    existing = db.query(ListaVerificacionDiario).filter(
-        ListaVerificacionDiario.fecha == hoy,
-        ListaVerificacionDiario.tipo == TipoChecklist(tipo)
-    ).first()
-    
-    if existing:
-        return RedirectResponse(url=f"/checklist/{existing.id}/editar", status_code=303)
-    
-    return templates.TemplateResponse(request=request, name="checklist/form.html", context={
-        "request": request,
-        "checklist": None,
-        "tipo": TipoChecklist(tipo),
-        "action": "/checklist/nuevo",
-        "title": f"Checklist de {tipo.capitalize()}",
-        "today": hoy.isoformat(),
-        "now": datetime.now().time().isoformat()[:5],
-    })
-
-
-@app.post("/checklist/nuevo")
-async def create_checklist(
-    request: Request,
-    db: Session = Depends(get_db),
-    tipo: str = Form(...),
-    fecha: str = Form(...),
-    hora_registro: str = Form(...),
-    responsable_nombre: str = Form(...),
-    responsable_firma: str = Form(""),
-    # Checklist items
-    cocina_limpia: bool = Form(False),
-    cocina_ordenada: bool = Form(False),
-    basureros_vacios: bool = Form(False),
-    equipos_funcionando: bool = Form(False),
-    temperaturas_ok: bool = Form(False),
-    extintores_ok: bool = Form(False),
-    uniformes_limpios: bool = Form(False),
-    manos_lavadas: bool = Form(False),
-    cabello_cubierto: bool = Form(False),
-    almacen_ordenado: bool = Form(False),
-    sin_plagas: bool = Form(False),
-    fecha_vencimiento_revisada: bool = Form(False),
-    observaciones: str = Form(""),
-):
-    checklist = ListaVerificacionDiario(
-        tipo=TipoChecklist(tipo),
-        fecha=datetime.strptime(fecha, "%Y-%m-%d").date(),
-        hora_registro=datetime.strptime(hora_registro, "%H:%M").time(),
-        responsable_nombre=responsable_nombre,
-        responsable_firma=responsable_firma or None,
-        cocina_limpia=cocina_limpia,
-        cocina_ordenada=cocina_ordenada,
-        basureros_vacios=basureros_vacios,
-        equipos_funcionando=equipos_funcionando,
-        temperaturas_ok=temperaturas_ok,
-        extintores_ok=extintores_ok,
-        uniformes_limpios=uniformes_limpios,
-        manos_lavadas=manos_lavadas,
-        cabello_cubierto=cabello_cubierto,
-        almacen_ordenado=almacen_ordenado,
-        sin_plagas=sin_plagas,
-        fecha_vencimiento_revisada=fecha_vencimiento_revisada,
-        observaciones=observaciones or None,
-    )
-    db.add(checklist)
-    db.commit()
-    return RedirectResponse(url="/checklist", status_code=303)
-
-
-@app.get("/checklist/{checklist_id}/editar", response_class=HTMLResponse)
-async def edit_checklist_form(request: Request, checklist_id: int, db: Session = Depends(get_db)):
-    checklist = db.query(ListaVerificacionDiario).filter(ListaVerificacionDiario.id == checklist_id).first()
-    if not checklist:
-        raise HTTPException(status_code=404, detail="Checklist no encontrado")
-    
-    return templates.TemplateResponse(request=request, name="checklist/form.html", context={
-        "request": request,
-        "checklist": checklist,
-        "tipo": checklist.tipo,
-        "action": f"/checklist/{checklist_id}/editar",
-        "title": f"Editar Checklist de {checklist.tipo.value.capitalize()}",
-    })
-
-
-@app.post("/checklist/{checklist_id}/editar")
-async def update_checklist(
-    checklist_id: int,
-    db: Session = Depends(get_db),
-    tipo: str = Form(...),
-    fecha: str = Form(...),
-    hora_registro: str = Form(...),
-    responsable_nombre: str = Form(...),
-    responsable_firma: str = Form(""),
-    cocina_limpia: bool = Form(False),
-    cocina_ordenada: bool = Form(False),
-    basureros_vacios: bool = Form(False),
-    equipos_funcionando: bool = Form(False),
-    temperaturas_ok: bool = Form(False),
-    extintores_ok: bool = Form(False),
-    uniformes_limpios: bool = Form(False),
-    manos_lavadas: bool = Form(False),
-    cabello_cubierto: bool = Form(False),
-    almacen_ordenado: bool = Form(False),
-    sin_plagas: bool = Form(False),
-    fecha_vencimiento_revisada: bool = Form(False),
-    observaciones: str = Form(""),
-):
-    checklist = db.query(ListaVerificacionDiario).filter(ListaVerificacionDiario.id == checklist_id).first()
-    if not checklist:
-        raise HTTPException(status_code=404, detail="Checklist no encontrado")
-    
-    checklist.tipo = TipoChecklist(tipo)
-    checklist.fecha = datetime.strptime(fecha, "%Y-%m-%d").date()
-    checklist.hora_registro = datetime.strptime(hora_registro, "%H:%M").time()
-    checklist.responsable_nombre = responsable_nombre
-    checklist.responsable_firma = responsable_firma or None
-    checklist.cocina_limpia = cocina_limpia
-    checklist.cocina_ordenada = cocina_ordenada
-    checklist.basureros_vacios = basureros_vacios
-    checklist.equipos_funcionando = equipos_funcionando
-    checklist.temperaturas_ok = temperaturas_ok
-    checklist.extintores_ok = extintores_ok
-    checklist.uniformes_limpios = uniformes_limpios
-    checklist.manos_lavadas = manos_lavadas
-    checklist.cabello_cubierto = cabello_cubierto
-    checklist.almacen_ordenado = almacen_ordenado
-    checklist.sin_plagas = sin_plagas
-    checklist.fecha_vencimiento_revisada = fecha_vencimiento_revisada
-    checklist.observaciones = observaciones or None
-    
-    db.commit()
-    return RedirectResponse(url="/checklist", status_code=303)
-
-
-# ──────────────────────────────────────────────
-# INVENTARIO - CRUD DE INGREDIENTES / STOCK
-# ──────────────────────────────────────────────
-
-@app.get("/inventario", response_class=HTMLResponse)
-async def list_inventario(request: Request, db: Session = Depends(get_db),
-                          search: str = "", categoria: str = "", sucursal_id: int = None, page: int = 1, per_page: int = 20):
-    query = db.query(IngredienteStock)
-    if search:
-        query = query.filter(IngredienteStock.nombre.ilike(f"%{search}%"))
-    if categoria:
-        try:
-            query = query.filter(IngredienteStock.categoria == CategoriaIngrediente(categoria))
-        except ValueError:
-            pass  # categoria invalida, ignorar filtro
-    # Filtro por sucursal (via StockSucursal) - solo si sucursal_id viene en query params
-    if sucursal_id:
-        # Subquery para obtener ingredientes que tienen stock en esa sucursal
-        subq = db.query(StockSucursal.ingrediente_id).filter(
-            StockSucursal.sucursal_id == sucursal_id,
-            StockSucursal.empresa_id == tenant_context.get()
-        ).subquery()
-        query = query.filter(IngredienteStock.id.in_(subq))
-
-    total = query.count()
-    ingredientes = query.order_by(IngredienteStock.nombre).offset((page - 1) * per_page).limit(per_page).all()
-
-    # Estadisticas para el resumen
-    valor_total = db.query(func.sum(IngredienteStock.stock_actual * IngredienteStock.costo_promedio)).filter(
-        IngredienteStock.activo == True
-    ).scalar() or 0
-    criticos = db.query(IngredienteStock).filter(
-        IngredienteStock.activo == True,
-        IngredienteStock.stock_actual <= IngredienteStock.stock_minimo
-    ).count()
-
-    return templates.TemplateResponse(request=request, name="inventario/list.html", context={
-        "request": request,
-        "ingredientes": ingredientes,
-        "search": search,
-        "categoria_filter": categoria,
-        "categorias": list(CategoriaIngrediente),
-        "unidades": list(UnidadMedida),
-        "page": page,
-        "per_page": per_page,
-        "total": total,
-        "total_pages": (total + per_page - 1) // per_page,
-        "valor_total": round(valor_total, 2),
-        "criticos": criticos,
-        "sucursal_id": sucursal_id,
-    })
-
-
-@app.get("/inventario/nuevo", response_class=HTMLResponse)
-async def new_ingrediente_form(request: Request):
-    return templates.TemplateResponse(request=request, name="inventario/form.html", context={
-        "request": request,
-        "ingrediente": None,
-        "categorias": list(CategoriaIngrediente),
-        "unidades": list(UnidadMedida),
-        "action": "/inventario/nuevo",
-        "title": "Nuevo Ingrediente",
-    })
-
-
-@app.post("/inventario/nuevo")
-async def create_ingrediente(
-    request: Request,
-    db: Session = Depends(get_db),
-    nombre: str = Form(...),
-    categoria: str = Form(...),
-    unidad_medida: str = Form(...),
-    stock_actual: float = Form(0.0),
-    stock_minimo: float = Form(0.0),
-    stock_maximo: float = Form(0.0),
-    costo_unitario: float = Form(0.0),
-    costo_promedio: float = Form(0.0),
-    dias_alerta_vencimiento: int = Form(3),
-    activo: bool = Form(True),
-):
-    ing = IngredienteStock(
-        nombre=nombre,
-        categoria=CategoriaIngrediente(categoria),
-        unidad_medida=UnidadMedida(unidad_medida),
-        stock_actual=stock_actual,
-        stock_minimo=stock_minimo,
-        stock_maximo=stock_maximo or None,
-        costo_unitario=costo_unitario,
-        costo_promedio=costo_promedio,
-        dias_alerta_vencimiento=dias_alerta_vencimiento,
-        activo=activo,
-    )
-    db.add(ing)
-    db.commit()
-    return RedirectResponse(url="/inventario", status_code=303)
-
-
-@app.get("/inventario/{ingrediente_id}/editar", response_class=HTMLResponse)
-async def edit_ingrediente_form(request: Request, ingrediente_id: int, db: Session = Depends(get_db)):
-    ing = db.query(IngredienteStock).filter(IngredienteStock.id == ingrediente_id).first()
-    if not ing:
-        raise HTTPException(status_code=404, detail="Ingrediente no encontrado")
-    return templates.TemplateResponse(request=request, name="inventario/form.html", context={
-        "request": request,
-        "ingrediente": ing,
-        "categorias": list(CategoriaIngrediente),
-        "unidades": list(UnidadMedida),
-        "action": f"/inventario/{ingrediente_id}/editar",
-        "title": "Editar Ingrediente",
-    })
-
-
-
-@app.get("/inventario/{ingrediente_id}/ajustar", response_class=HTMLResponse)
-async def ajustar_stock_form(request: Request, ingrediente_id: int, db: Session = Depends(get_db), user: Usuario = Depends(require_auth)):
-    """Formulario para ajustar stock de un ingrediente (entrada/salida manual)"""
-    ing = db.query(IngredienteStock).filter(IngredienteStock.id == ingrediente_id).first()
-    if not ing:
-        raise HTTPException(status_code=404, detail="Ingrediente no encontrado")
-    
-    # Obtener sucursales de la empresa para selector
-    sucursales = db.query(Sucursal).filter(Sucursal.empresa_id == user.empresa_id, Sucursal.activa == True).all()
-    
-    return templates.TemplateResponse(request=request, name="inventario/ajustar.html", context={
-        "request": request,
-        "ingrediente": ing,
-        "sucursales": sucursales,
-        "user": user,
-    })
-
-@app.post("/inventario/{ingrediente_id}/ajustar")
-async def ajustar_stock_post(
-    ingrediente_id: int,
-    request: Request,
-    db: Session = Depends(get_db),
-    user: Usuario = Depends(require_auth),
-    tipo: str = Form(...),  # "entrada" o "salida"
-    cantidad: float = Form(...),
-    sucursal_id: int = Form(None),
-    observaciones: str = Form(""),
-):
-    """Procesa ajuste de stock (entrada/salida)"""
-    ing = db.query(IngredienteStock).filter(IngredienteStock.id == ingrediente_id).first()
-    if not ing:
-        raise HTTPException(status_code=404, detail="Ingrediente no encontrado")
-    
-    if cantidad <= 0:
-        raise HTTPException(status_code=400, detail="La cantidad debe ser mayor a cero")
-    
-    # Validar stock suficiente para salida
-    if tipo == "salida":
-        stock_disponible = ing.stock_actual
-        if sucursal_id:
-            stock_suc = db.query(StockSucursal).filter(
-                StockSucursal.ingrediente_id == ingrediente_id,
-                StockSucursal.sucursal_id == sucursal_id,
-                StockSucursal.empresa_id == user.empresa_id
-            ).first()
-            stock_disponible = stock_suc.stock_actual if stock_suc else 0
-        if stock_disponible < cantidad:
-            raise HTTPException(status_code=400, detail=f"Stock insuficiente. Disponible: {stock_disponible}")
-    
-    # Aplicar ajuste
-    if tipo == "entrada":
-        ing.stock_actual += cantidad
-    else:
-        ing.stock_actual -= cantidad
-    
-    # Actualizar stock por sucursal si corresponde
-    if sucursal_id:
-        stock_suc = db.query(StockSucursal).filter(
-            StockSucursal.ingrediente_id == ingrediente_id,
-            StockSucursal.sucursal_id == sucursal_id,
-            StockSucursal.empresa_id == user.empresa_id
-        ).first()
-        if not stock_suc:
-            stock_suc = StockSucursal(
-                ingrediente_id=ingrediente_id,
-                sucursal_id=sucursal_id,
-                empresa_id=user.empresa_id,
-                stock_actual=0
-            )
-            db.add(stock_suc)
-        if tipo == "entrada":
-            stock_suc.stock_actual += cantidad
-        else:
-            stock_suc.stock_actual -= cantidad
-    
-    # Registrar en AjusteInventario
-    ajuste = AjusteInventario(
-        ingrediente_id=ingrediente_id,
-        sucursal_id=sucursal_id,
-        tipo=tipo,
-        cantidad=cantidad,
-        observaciones=observaciones or None,
-        usuario_id=user.id,
-        empresa_id=user.empresa_id,
-    )
-    db.add(ajuste)
-    db.commit()
-    
-    return RedirectResponse(url="/inventario", status_code=303)
-
-
-@app.post("/inventario/{ingrediente_id}/editar")
-async def update_ingrediente(
-    ingrediente_id: int,
-    db: Session = Depends(get_db),
-    nombre: str = Form(...),
-    categoria: str = Form(...),
-    unidad_medida: str = Form(...),
-    stock_actual: float = Form(...),
-    stock_minimo: float = Form(...),
-    stock_maximo: float = Form(0.0),
-    costo_unitario: float = Form(...),
-    costo_promedio: float = Form(...),
-    dias_alerta_vencimiento: int = Form(3),
-    activo: bool = Form(True),
-):
-    ing = db.query(IngredienteStock).filter(IngredienteStock.id == ingrediente_id).first()
-    if not ing:
-        raise HTTPException(status_code=404, detail="Ingrediente no encontrado")
-    ing.nombre = nombre
-    ing.categoria = CategoriaIngrediente(categoria)
-    ing.unidad_medida = UnidadMedida(unidad_medida)
-    ing.stock_actual = stock_actual
-    ing.stock_minimo = stock_minimo
-    ing.stock_maximo = stock_maximo or None
-    ing.costo_unitario = costo_unitario
-    ing.costo_promedio = costo_promedio
-    ing.dias_alerta_vencimiento = dias_alerta_vencimiento
-    ing.activo = activo
-    ing.updated_at = func.now()
-    db.commit()
-    return RedirectResponse(url="/inventario", status_code=303)
-
-
-# ──────────────────────────────────────────────
-# COMPRAS - CRUD DE FACTURAS DE COMPRA
-# ──────────────────────────────────────────────
-
-@app.get("/compras", response_class=HTMLResponse)
-async def list_compras(request: Request, db: Session = Depends(get_db),
-                      estado: str = "", page: int = 1, per_page: int = 20):
-    query = db.query(RegistroCompra).options(joinedload(RegistroCompra.proveedor))
-    if estado:
-        try:
-            query = query.filter(RegistroCompra.estado == EstadoAprobacion(estado))
-        except ValueError:
-            pass
-
-    total = query.count()
-    compras = query.order_by(desc(RegistroCompra.fecha_registro)).offset((page - 1) * per_page).limit(per_page).all()
-
-    # Totales para el resumen
-    total_mes = db.query(func.sum(RegistroCompra.total)).filter(
-        RegistroCompra.fecha_compra >= date.today().replace(day=1)
-    ).scalar() or 0
-    pendientes = db.query(RegistroCompra).filter(
-        RegistroCompra.estado == EstadoAprobacion.PENDIENTE
-    ).count()
-
-    return templates.TemplateResponse(request=request, name="compras/list.html", context={
-        "request": request,
-        "compras": compras,
-        "estados": list(EstadoAprobacion),
-        "estado_filter": estado,
-        "page": page,
-        "per_page": per_page,
-        "total": total,
-        "total_pages": (total + per_page - 1) // per_page,
-        "total_mes": round(total_mes, 2),
-        "pendientes": pendientes,
-    })
-
-
-@app.get("/compras/nueva", response_class=HTMLResponse)
-async def new_compra_form(request: Request, db: Session = Depends(get_db)):
-    proveedores = db.query(Proveedor).filter(Proveedor.activo == True).order_by(Proveedor.nombre).all()
-    ingredientes = db.query(IngredienteStock).filter(IngredienteStock.activo == True).order_by(IngredienteStock.nombre).all()
-    return templates.TemplateResponse(request=request, name="compras/form.html", context={
-        "request": request,
-        "compra": None,
-        "detalles": [],
-        "proveedores": proveedores,
-        "ingredientes": ingredientes,
-        "estados": list(EstadoAprobacion),
-        "action": "/compras/nueva",
-        "title": "Nueva Compra",
-        "today": date.today().isoformat(),
-    })
-
-
-@app.get("/compras/{compra_id}", response_class=HTMLResponse)
-async def detail_compra(request: Request, compra_id: int, db: Session = Depends(get_db)):
-    compra = db.query(RegistroCompra).options(
-        joinedload(RegistroCompra.proveedor),
-        joinedload(RegistroCompra.detalles)
-    ).filter(RegistroCompra.id == compra_id).first()
-    if not compra:
-        raise HTTPException(status_code=404, detail="Compra no encontrada")
-    return templates.TemplateResponse(request=request, name="compras/detail.html", context={
-        "request": request,
-        "compra": compra,
-    })
-
-
-@app.post("/compras/{compra_id}/aprobar")
-async def aprobar_compra(compra_id: int, db: Session = Depends(get_db),
-                         aprobado_por: str = Form(...)):
-    compra = db.query(RegistroCompra).filter(RegistroCompra.id == compra_id).first()
-    if not compra:
-        raise HTTPException(status_code=404, detail="Compra no encontrada")
-    if compra.estado == EstadoAprobacion.APROBADO:
-        raise HTTPException(status_code=400, detail="Ya está aprobada")
-    compra.estado = EstadoAprobacion.APROBADO
-    compra.aprobado_por_usuario_id = None  # TODO: usuario actual desde sesion
-    compra.fecha_aprobacion = func.now()
-    # Al aprobar: incrementar stock de ingredientes de los detalles
-    for det in compra.detalles:
-        ing = det.ingrediente
-        ing.stock_actual += det.cantidad
-        # Recalcular costo promedio (PPM)
-        ing.costo_promedio = det.costo_unitario
-        ing.updated_at = func.now()
-    db.commit()
-    return RedirectResponse(url="/compras", status_code=303)
-
-
-@app.post("/compras/{compra_id}/rechazar")
-async def rechazar_compra(compra_id: int, db: Session = Depends(get_db),
-                          rechazado_por: str = Form(...)):
-    compra = db.query(RegistroCompra).filter(RegistroCompra.id == compra_id).first()
-    if not compra:
-        raise HTTPException(status_code=404, detail="Compra no encontrada")
-    compra.estado = EstadoAprobacion.RECHAZADO
-    compra.fecha_aprobacion = func.now()
-    db.commit()
-    return RedirectResponse(url="/compras", status_code=303)
-
-
-
-
-# ──────────────────────────────────────────────
-# FASE 3: INVENTARIO FÍSICO
-# ──────────────────────────────────────────────
-
-@app.get("/health")
-async def health_check():
-    return {"status": "ok", "service": "ERP Gastronómico", "version": "2.1.0"}
-
-
-# ──────────────────────────────────────────────
-# CONTEXT PROCESSOR GLOBAL — inyecta current_user en todos los templates
-# (Adición quirúrgica: no modifica rutas existentes. Permite que base.html
-#  muestre el menú RBAC correctamente incluso en rutas que no pasan 'user'.)
-# ──────────────────────────────────────────────
-
-from starlette.middleware.base import BaseHTTPMiddleware
-
-@app.middleware("http")
-async def inject_current_user_middleware(request: Request, call_next):
-    """Inyecta current_user en request.state para que esté disponible en templates.
-    No reemplaza require_auth; solo hace que el usuario (si existe) sea accesible
-    globalmente para el menú RBAC de base.html."""
-    # Intentar obtener el usuario desde la cookie JWT (sin exigir login)
-    try:
-        token = request.cookies.get("access_token")
-        if token:
-            if token.startswith("Bearer "):
-                token = token[7:]
-            payload = decode_token(token)
-            if payload:
-                user_id = payload.get("sub")
-                if user_id:
-                    user_id_int = int(user_id)
-                    db = SessionLocal()
-                    try:
-                        user = db.query(Usuario).filter(
-                            Usuario.id == user_id_int, Usuario.activo == True
-                        ).first()
-                        if user:
-                            request.state.current_user = user
-                    finally:
-                        db.close()
-    except Exception:
-        pass  # Silencioso: si no hay usuario, no rompe la página
-
-    response = await call_next(request)
-    return response
-
-
-# Middleware Jinja2: inyectar current_user en el context de cada template
-_original_TemplateResponse = templates.TemplateResponse
-
-def _patched_TemplateResponse(*args, **kwargs):
-    """Wrapper que añade current_user y empresa al context automáticamente."""
-    if 'request' in kwargs:
-        request = kwargs['request']
-    elif args:
-        request = args[0]
-    else:
-        # This branch should not happen in normal operation because the view functions always pass request?
-        # But we keep it for safety.
-        request = None
-    context = kwargs.get('context') or {}
-    # current_user (legacy, compatibilidad con rutas existentes)
-    if 'current_user' not in context:
-        cu = getattr(request.state, 'current_user', None) if request and hasattr(request, 'state') else None
-        if cu:
-            context['current_user'] = cu
-    # Branding dinámico: empresa desde request.state (cargada por get_current_user)
-    if 'empresa' not in context:
-        emp = getattr(request.state, 'empresa', None) if request and hasattr(request, 'state') else None
-        if emp:
-            context['empresa'] = emp
-    # Inject sucursales into context if not present
-    if 'sucursales' not in context:
-        emp = getattr(request.state, 'empresa', None) if request and hasattr(request, 'state') else None
-        if emp:
-            try:
-                db = SessionLocal()
-                sucursales_q = db.query(Sucursal).filter(Sucursal.empresa_id == emp.id, Sucursal.activa == True).order_by(Sucursal.nombre).all()
-                context['sucursales'] = sucursales_q
-            finally:
-                db.close()
-    kwargs['context'] = context
-    return _original_TemplateResponse(*args, **kwargs)
-templates.TemplateResponse = _patched_TemplateResponse
-
-
-# ──────────────────────────────────────────────
-# COMPRAS — POST /compras/nueva (Adición: faltaba el endpoint que recibe el form)
-# ──────────────────────────────────────────────
-
-@app.post("/compras/nueva")
-async def create_compra(
-    request: Request,
-    db: Session = Depends(get_db),
-    user: Usuario = Depends(require_auth),
-    numero_factura: str = Form(...),
-    proveedor_id: int = Form(...),
-    fecha_compra: str = Form(...),
-    subtotal: float = Form(0.0),
-    iva: float = Form(0.0),
-    total: float = Form(0.0),
-    observaciones: str = Form(""),
-    # Detalles pueden venir como arrays (form multipart con campos dinámicos)
-    ingrediente_ids: List[int] = Form([]),
-    cantidades: List[float] = Form([]),
-    costos_unitarios: List[float] = Form([]),
-):
-    """Crea una compra con sus detalles. Incrementa stock al aprobar (no aquí)."""
-    # Validar proveedor
-    proveedor = db.query(Proveedor).filter(Proveedor.id == proveedor_id).first()
-    if not proveedor:
-        raise HTTPException(status_code=404, detail="Proveedor no encontrado")
-
-    # Crear cabecera de compra
-    compra = RegistroCompra(
-        numero_factura=numero_factura,
-        proveedor_id=proveedor_id,
-        fecha_compra=datetime.strptime(fecha_compra, "%Y-%m-%d").date(),
-        subtotal=subtotal,
-        iva=iva,
-        total=total,
-        observaciones=observaciones or None,
-        estado=EstadoAprobacion.PENDIENTE,
-        creado_por_usuario_id=user.id if user else None,
-    )
-    db.add(compra)
-    db.flush()  # Obtener el ID
-
-    # Crear detalles (si vienen arrays)
-    for i in range(min(len(ingrediente_ids), len(cantidades), len(costos_unitarios))):
-        ing_id = ingrediente_ids[i]
-        cantidad = cantidades[i]
-        costo_unit = costos_unitarios[i]
-
-        ingrediente = db.query(IngredienteStock).filter(IngredienteStock.id == ing_id).first()
-        if not ingrediente:
-            continue  # Ignorar ingredientes inválidos
-
-        detalle = DetalleCompra(
-            compra_id=compra.id,
-            ingrediente_id=ing_id,
-            cantidad=cantidad,
-            costo_unitario=costo_unit,
-            costo_total=round(cantidad * costo_unit, 2),
-        )
-        db.add(detalle)
-
-    db.commit()
-    return RedirectResponse(url=f"/compras/{compra.id}", status_code=303)
-
-
-# ──────────────────────────────────────────────
-# PANEL DE ADMINISTRACIÓN DE USUARIOS (Solo ADMINISTRADOR)
-# Adición quirúrgica: no modifica rutas existentes. Usa require_admin.
-# ──────────────────────────────────────────────
-
-@app.get("/usuarios", response_class=HTMLResponse)
-async def list_usuarios(
-    request: Request,
-    db: Session = Depends(get_db),
-    user: Usuario = Depends(get_admin_user),
-):
-    """Lista todos los usuarios y sucursales. Solo ADMINISTRADOR."""
-    usuarios = db.query(Usuario).order_by(Usuario.rol, Usuario.nombre_completo).all()
-    sucursales = db.query(Sucursal).filter(Sucursal.activa == True).order_by(Sucursal.nombre).all()
-
-    # Estadísticas rápidas
-    total_activos = db.query(Usuario).filter(Usuario.activo == True).count()
-    total_admins = db.query(Usuario).filter(Usuario.rol == RolUsuario.ADMINISTRADOR, Usuario.activo == True).count()
-    total_encargados = db.query(Usuario).filter(Usuario.rol == RolUsuario.ENCARGADO, Usuario.activo == True).count()
-    total_operadores = db.query(Usuario).filter(Usuario.rol == RolUsuario.OPERADOR, Usuario.activo == True).count()
-
-    return templates.TemplateResponse(request=request, name="usuarios.html", context={
-        "request": request,
-        "user": user,
-        "usuarios": usuarios,
-        "sucursales": sucursales,
-        "roles": list(RolUsuario),
-        "total_activos": total_activos,
-        "total_admins": total_admins,
-        "total_encargados": total_encargados,
-        "total_operadores": total_operadores,
-        "error": None,
-        "success": None,
-    })
-
-
-@app.post("/usuarios")
-async def create_usuario(
-    request: Request,
-    db: Session = Depends(get_db),
-    user: Usuario = Depends(get_admin_user),
-    nombre_completo: str = Form(...),
-    email: str = Form(...),
-    password: str = Form(...),
-    rol: str = Form(...),
-    sucursal_id: int = Form(0),
-):
-    """Registra nuevo usuario. Encripta password con bcrypt. Solo ADMINISTRADOR."""
-    # Validar email único
-    existing = db.query(Usuario).filter(Usuario.email == email).first()
-    if existing:
-        usuarios = db.query(Usuario).order_by(Usuario.rol, Usuario.nombre_completo).all()
-        sucursales = db.query(Sucursal).filter(Sucursal.activa == True).order_by(Sucursal.nombre).all()
-        return templates.TemplateResponse(request=request, name="usuarios.html", context={
-            "request": request,
-            "user": user,
-            "usuarios": usuarios,
-            "sucursales": sucursales,
-            "roles": list(RolUsuario),
-            "total_activos": 0, "total_admins": 0, "total_encargados": 0, "total_operadores": 0,
-            "error": f"Ya existe un usuario con el email {email}",
-            "success": None,
-        }, status_code=400)
-
-    # Validar rol
-    try:
-        rol_enum = RolUsuario(rol)
-    except ValueError:
-        raise HTTPException(status_code=400, detail=f"Rol inválido: {rol}")
-
-    # Encriptar contraseña con bcrypt (get_password_hash)
-    hashed_password = get_password_hash(password)
-
-    # Sucursal opcional (0 = sin sucursal / global)
-    sucursal_fk = sucursal_id if sucursal_id > 0 else None
-
-    nuevo_usuario = Usuario(
-        nombre_completo=nombre_completo,
-        email=email,
-        password_hash=hashed_password,
-        rol=rol_enum,
-        sucursal_id=sucursal_fk,
-        activo=True,
-    )
-    db.add(nuevo_usuario)
-    db.commit()
-
-    return RedirectResponse(url="/usuarios?ok=1", status_code=303)
-
-
-@app.post("/usuarios/{usuario_id}/toggle")
-async def toggle_usuario(
-    usuario_id: int,
-    db: Session = Depends(get_db),
-    user: Usuario = Depends(require_admin),
-):
-    """Activa/desactiva un usuario. Solo ADMINISTRADOR. No permite auto-desactivarse."""
-    target = db.query(Usuario).filter(Usuario.id == usuario_id).first()
-    if not target:
-        raise HTTPException(status_code=404, detail="Usuario no encontrado")
-    if target.id == user.id:
-        raise HTTPException(status_code=400, detail="No puedes desactivar tu propia cuenta")
-    target.activo = not target.activo
-    target.updated_at = func.now()
-    db.commit()
-    return RedirectResponse(url="/usuarios", status_code=303)
-
-
-
-# ──────────────────────────────────────────────
-# FASE 4 — OPERACIONES AVANZADAS: Incidencias + Ejecución de Checklists
-# ──────────────────────────────────────────────
-
-@app.get("/operaciones", response_class=HTMLResponse)
-async def panel_operaciones(
-    request: Request,
-    db: Session = Depends(get_db),
-    user: Usuario = Depends(require_auth),
-):
-    """Panel operativo: incidencias activas + checklists disponibles."""
-    incidencias = db.query(Incidencia).filter(
-        Incidencia.estado.in_([EstadoIncidencia.ABIERTA, EstadoIncidencia.EN_REVISION])
-    ).order_by(Incidencia.severidad.desc(), Incidencia.fecha_reporte.desc()).all()
-    checklists = db.query(ListaVerificacionDiario).order_by(ListaVerificacionDiario.fecha.desc()).limit(10).all()
-    return templates.TemplateResponse(request=request, name="operaciones.html", context={
-        "request": request, "user": user,
-        "incidencias": incidencias,
-        "checklists": checklists,
-        "error": None, "success": None,
-    })
-
-
-# ── Incidencias ────────────────────────────────────────────
-
-@app.get("/incidencias/nueva", response_class=HTMLResponse)
-async def incidencia_form(
-    request: Request,
-    user: Usuario = Depends(require_auth),
-):
-    """Formulario para reportar una nueva incidencia (cualquier rol autenticado)."""
-    return templates.TemplateResponse(request=request, name="incidencia_form.html", context={
-        "request": request, "user": user,
-        "tipos": list(TipoIncidencia),
-        "severidades": list(Severidad),
-        "error": None,
-    })
-
-
-@app.post("/incidencias/nueva", response_class=HTMLResponse)
-async def incidencia_create(
-    request: Request,
-    db: Session = Depends(get_db),
-    user: Usuario = Depends(require_auth),
-    tipo: str = Form(...),
-    titulo: str = Form(...),
-    descripcion: str = Form(""),
-    severidad: str = Form("Media"),
-):
-    """Crea una incidencia. Operador de Cocina puede reportar."""
-    try:
-        tipo_enum = TipoIncidencia(tipo)
-        sev_enum = Severidad(severidad)
-    except ValueError:
-        return templates.TemplateResponse(request=request, name="incidencia_form.html", context={
-            "request": request, "user": user,
-            "tipos": list(TipoIncidencia), "severidades": list(Severidad),
-            "error": "Tipo o severidad inválido.",
-        }, status_code=400)
-    inc = Incidencia(
-        tipo=tipo_enum, titulo=titulo, descripcion=descripcion or None,
-        severidad=sev_enum, estado=EstadoIncidencia.ABIERTA,
-        reportado_por_id=user.id,
-    )
-    db.add(inc); db.commit()
-    return RedirectResponse(url="/operaciones?ok=1", status_code=303)
-
-
-@app.post("/incidencias/{incidencia_id}/estado", response_class=HTMLResponse)
-async def incidencia_cambiar_estado(
-    incidencia_id: int,
-    request: Request,
-    db: Session = Depends(get_db),
-    user: Usuario = Depends(require_encargado_or_admin),
-    nuevo_estado: str = Form(...),
-):
-    """Cambia el estado de una incidencia. Solo Encargado o Admin."""
-    inc = db.query(Incidencia).filter(Incidencia.id == incidencia_id).first()
-    if not inc:
-        raise HTTPException(status_code=404, detail="Incidencia no encontrada")
-    try:
-        inc.estado = EstadoIncidencia(nuevo_estado)
-    except ValueError:
-        raise HTTPException(status_code=400, detail="Estado inválido")
-    if inc.estado == EstadoIncidencia.RESUELTA or inc.estado == EstadoIncidencia.CERRADA:
-        inc.fecha_resolucion = func.now()
-    inc.updated_at = func.now()
-    db.commit()
-    return RedirectResponse(url="/operaciones", status_code=303)
-
-
-# ── Ejecución de Checklists ────────────────────────────────
-
-@app.get("/checklist/{checklist_id}/ejecutar", response_class=HTMLResponse)
-async def checklist_ejecutar_form(
-    checklist_id: int,
-    request: Request,
-    db: Session = Depends(get_db),
-    user: Usuario = Depends(require_auth),
-):
-    """Formulario para ejecutar un checklist (Operador llena)."""
-    checklist = db.query(ListaVerificacionDiario).filter(ListaVerificacionDiario.id == checklist_id).first()
-    if not checklist:
-        raise HTTPException(status_code=404, detail="Checklist no encontrado")
-    ejecuciones = db.query(EjecucionChecklist).filter(
-        EjecucionChecklist.checklist_id == checklist_id
-    ).order_by(EjecucionChecklist.fecha_ejecucion.desc()).all()
-    return templates.TemplateResponse(request=request, name="checklist_ejecutar.html", context={
-        "request": request, "user": user,
-        "checklist": checklist, "ejecuciones": ejecuciones,
-        "estados": list(EstadoEjecucion),
-        "error": None,
-    })
-
-
-@app.post("/checklist/{checklist_id}/ejecutar", response_class=HTMLResponse)
-async def checklist_ejecutar_create(
-    checklist_id: int,
-    request: Request,
-    db: Session = Depends(get_db),
-    user: Usuario = Depends(require_auth),
-    estado: str = Form("Completada"),
-    observaciones: str = Form(""),
-):
-    """Registra una ejecución de checklist (Operador completa)."""
-    checklist = db.query(ListaVerificacionDiario).filter(ListaVerificacionDiario.id == checklist_id).first()
-    if not checklist:
-        raise HTTPException(status_code=404, detail="Checklist no encontrado")
-    try:
-        estado_enum = EstadoEjecucion(estado)
-    except ValueError:
-        raise HTTPException(status_code=400, detail="Estado inválido")
-    ej = EjecucionChecklist(
-        checklist_id=checklist_id,
-        usuario_id=user.id,
-        fecha_ejecucion=date.today(),
-        hora_ejecucion=datetime.now().time(),
-        estado=estado_enum,
-        observaciones=observaciones or None,
-    )
-    db.add(ej); db.commit()
-    return RedirectResponse(url=f"/checklist/{checklist_id}/ejecutar?ok=1", status_code=303)
-
-
-if __name__ == "__main__":
-    import uvicorn
-    
-
-# ──────────────────────────────────────────────
-# INCIDENCIAS - CREAR (para botón en operaciones.html)
-# ──────────────────────────────────────────────
-
-@app.get("/incidencias/nueva", response_class=HTMLResponse)
-async def new_incidencia_form(request: Request, db: Session = Depends(get_db), user: Usuario = Depends(require_auth)):
-    return templates.TemplateResponse(request=request, name="incidencia_form.html", context={
-        "request": request,
-        "incidencia": None,
-        "tipos": list(TipoIncidencia),
-        "severidades": list(Severidad),
-        "action": "/incidencias/nueva",
-        "title": "Reportar Incidencia",
-        "today": date.today().isoformat(),
-        "now": datetime.now().time().isoformat()[:5],
-    })
-
-@app.post("/incidencias/nueva")
-async def create_incidencia(
-    request: Request,
-    db: Session = Depends(get_db),
-    user: Usuario = Depends(require_auth),
-    tipo: str = Form(...),
-    titulo: str = Form(...),
-    descripcion: str = Form(""),
-    severidad: str = Form("Media"),
-):
-    incidencia = Incidencia(
-        tipo=TipoIncidencia(tipo),
-        titulo=titulo,
-        descripcion=descripcion or None,
-        severidad=Severidad(severidad),
-        reportado_por_id=user.id,
-        estado=EstadoIncidencia.ABIERTA,
-        fecha_reporte=func.now(),
-        empresa_id=user.empresa_id,
-    )
-    db.add(incidencia)
-    db.commit()
-    return RedirectResponse(url="/operaciones?ok=1", status_code=303)
-
-
-# ──────────────────────────────────────────────
-# CHECKLIST EJECUTAR (para botón en operaciones.html)
-# ──────────────────────────────────────────────
-
-@app.get("/checklist/{checklist_id}/ejecutar", response_class=HTMLResponse)
-async def ejecutar_checklist_form(request: Request, checklist_id: int, db: Session = Depends(get_db), user: Usuario = Depends(require_auth)):
-    checklist = db.query(ListaVerificacionDiario).filter(ListaVerificacionDiario.id == checklist_id).first()
-    if not checklist:
-        raise HTTPException(status_code=404, detail="Checklist no encontrado")
-    
-    return templates.TemplateResponse(request=request, name="checklist_ejecutar.html", context={
-        "request": request,
-        "checklist": checklist,
-        "user": user,
-        "today": date.today().isoformat(),
-        "now": datetime.now().time().isoformat()[:5],
-    })
-
-@app.post("/checklist/{checklist_id}/ejecutar")
-async def ejecutar_checklist_post(
-    checklist_id: int,
-    request: Request,
-    db: Session = Depends(get_db),
-    user: Usuario = Depends(require_auth),
-    estado: str = Form(...),
-    observaciones: str = Form(""),
-    firma: str = Form(""),
-):
-    checklist = db.query(ListaVerificacionDiario).filter(ListaVerificacionDiario.id == checklist_id).first()
-    if not checklist:
-        raise HTTPException(status_code=404, detail="Checklist no encontrado")
-    
-    # Crear registro de ejecución (EjecucionChecklist)
-    ejecucion = EjecucionChecklist(
-        checklist_id=checklist_id,
-        usuario_id=user.id,
-        fecha_ejecucion=date.today(),
-        hora_ejecucion=datetime.now().time(),
-        estado=EstadoEjecucion(estado),
-        observaciones=observaciones or None,
-        firma=firma or None,
-    )
-    db.add(ejecucion)
-    db.commit()
-    return RedirectResponse(url="/operaciones?ok=1", status_code=303)
-
 
 if __name__ == "__main__":
     uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=False)
-
-
-# ──────────────────────────────────────────────
-# FASE 4 — BRANDING: Configuración visual de la empresa
-# ──────────────────────────────────────────────
-
-@app.get("/configuracion/branding", response_class=HTMLResponse)
-async def branding_form(
-    request: Request,
-    db: Session = Depends(get_db),
-    user: Usuario = Depends(get_admin_user),
-):
-    """Formulario de branding: colores, logo, tema. Solo ADMIN del tenant."""
-    empresa = db.query(Empresa).filter(Empresa.id == user.empresa_id).first()
-    if not empresa:
-        raise HTTPException(status_code=404, detail="Empresa no encontrada")
-    return templates.TemplateResponse(request=request, name="configuracion_branding.html", context={
-        "request": request,
-        "user": user,
-        "empresa": empresa,
-        "error": None,
-        "success": None,
-    })
-
-
-@app.post("/configuracion/branding", response_class=HTMLResponse)
-async def branding_update(
-    request: Request,
-    db: Session = Depends(get_db),
-    user: Usuario = Depends(require_admin),
-    nombre_comercial: str = Form(""),
-    color_primario: str = Form(""),
-    color_secundario: str = Form(""),
-    tema: str = Form("claro"),
-    logo_url: str = Form(""),
-    favicon_url: str = Form(""),
-):
-    """Actualiza campos de branding de la empresa del admin."""
-    empresa = db.query(Empresa).filter(Empresa.id == user.empresa_id).first()
-    if not empresa:
-        raise HTTPException(status_code=404, detail="Empresa no encontrada")
-
-    def _render(error=None, success=None):
-        return templates.TemplateResponse(request=request, name="configuracion_branding.html", context={
-            "request": request, "user": user, "empresa": empresa,
-            "error": error, "success": success,
-        }, status_code=400 if error else 200)
-
-    # Validar colores (formato hex opcional)
-    for nombre, valor in [("color primario", color_primario), ("color secundario", color_secundario)]:
-        if valor and not valor.startswith("#"):
-            return _render(error=f"El {nombre} debe empezar con # (ej. #1a1a2e)")
-
-    empresa.nombre_comercial = nombre_comercial or empresa.nombre_comercial
-    empresa.color_primario   = color_primario or empresa.color_primario
-    empresa.color_secundario = color_secundario or empresa.color_secundario
-    empresa.tema             = tema
-    empresa.logo_url         = logo_url or empresa.logo_url
-    empresa.favicon_url      = favicon_url or empresa.favicon_url
-    empresa.updated_at       = func.now()
-    db.commit()
-    # Refrescar request.state para que base.html vea los cambios inmediatamente
-    request.state.empresa = empresa
-
-    return _render(success="Branding actualizado correctamente. Los cambios se reflejan en toda la plataforma.")
-
-# ── SUCURSALES ADMINISTRACIÓN ──
-@app.get("/configuracion/sucursales", response_class=HTMLResponse)
-async def configuracion_sucursales(request: Request, db: Session = Depends(get_db), user: Usuario = Depends(get_current_user)):
-    if not user or user.rol not in [RolUsuario.ADMINISTRADOR, RolUsuario.SUPER_ADMIN]:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="No autorizado")
-    # Obtener sucursales activas (filtrado por tenant ya aplicado)
-    sucursales = db.query(Sucursal).filter(Sucursal.activa == True).order_by(Sucursal.nombre).all()
-    return templates.TemplateResponse("sucursales_admin.html", {"request": request, "user": user, "sucursales": sucursales})
-
-@app.post("/configuracion/sucursales/{sucursal_id}/editar", response_class=RedirectResponse)
-async def editar_sucursal(sucursal_id: int, request: Request, db: Session = Depends(get_db), user: Usuario = Depends(get_current_user), nombre: str = Form(...)):
-    if not user or user.rol not in [RolUsuario.ADMINISTRADOR, RolUsuario.SUPER_ADMIN]:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="No autorizado")
-    sucursal = db.query(Sucursal).filter(Sucursal.id == sucursal_id).first()
-    if not sucursal:
-        raise HTTPException(status_code=404, detail="Sucursal no encontrada")
-    sucursal.nombre = nombre
-    db.add(sucursal)
-    db.commit()
-    return RedirectResponse(url="/configuracion/sucursales?ok=1", status_code=status.HTTP_302_FOUND)
