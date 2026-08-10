@@ -180,6 +180,7 @@ class Sucursal(Base, TenantMixin):
     activa = Column(Boolean, default=True, index=True)
     created_at = Column(DateTime, default=func.now())
     updated_at = Column(DateTime, default=func.now(), onupdate=func.now())
+    ultima_actualizacion = Column(DateTime, default=func.now(), onupdate=func.now())
 
     # Relaciones
     empresa = relationship("Empresa", back_populates="sucursales")
@@ -207,6 +208,7 @@ class Usuario(Base, TenantMixin):
     ultimo_acceso = Column(DateTime, nullable=True)
     created_at = Column(DateTime, default=func.now())
     updated_at = Column(DateTime, default=func.now(), onupdate=func.now())
+    ultima_actualizacion = Column(DateTime, default=func.now(), onupdate=func.now())
 
     # Relaciones
     sucursal = relationship("Sucursal", back_populates="usuarios")
@@ -255,6 +257,7 @@ class Proveedor(Base, TenantMixin):
     activo = Column(Boolean, default=True)
     created_at = Column(DateTime, default=func.now())
     updated_at = Column(DateTime, default=func.now(), onupdate=func.now())
+    ultima_actualizacion = Column(DateTime, default=func.now(), onupdate=func.now())
 
     # Relaciones
     compras = relationship("RegistroCompra", back_populates="proveedor")
@@ -286,6 +289,7 @@ class IngredienteStock(Base, TenantMixin):
     activo = Column(Boolean, default=True)
     created_at = Column(DateTime, default=func.now())
     updated_at = Column(DateTime, default=func.now(), onupdate=func.now())
+    ultima_actualizacion = Column(DateTime, default=func.now(), onupdate=func.now())
 
     # Relaciones
     detalles_compra = relationship("DetalleCompra", back_populates="ingrediente")
@@ -768,10 +772,23 @@ def seed_initial_data(db: Session):
     if db.query(Proveedor).first():
         return
 
-    # 1. SUCURSALES
+    # 0. EMPRESA (tenant root) - requerido para multi-tenant
+    empresa = Empresa(
+        nombre="Empresa Demo",
+        rut="76.000.000-0",
+        plan="enterprise",
+        activa=True,
+        nombre_comercial="GastroFlow Demo",
+        color_primario="#1a1a2e",
+        color_secundario="#16213e",
+    )
+    db.add(empresa)
+    db.flush()
+
+    # 1. SUCURSALES (con empresa_id)
     sucursales = [
-        Sucursal(nombre="Casa Matriz", direccion="Av. Principal 123, Santiago"),
-        Sucursal(nombre="Sucursal Norte", direccion="Calle Norte 456, Santiago"),
+        Sucursal(nombre="Casa Matriz", direccion="Av. Principal 123, Santiago", empresa_id=empresa.id),
+        Sucursal(nombre="Sucursal Norte", direccion="Calle Norte 456, Santiago", empresa_id=empresa.id),
     ]
     db.add_all(sucursales)
     db.flush()
@@ -787,6 +804,7 @@ def seed_initial_data(db: Session):
             password_hash=pwd_hash,
             rol=RolUsuario.ADMINISTRADOR,
             sucursal_id=sucursales[0].id,
+            empresa_id=empresa.id,
             debe_cambiar_password=False,  # usuario raíz de desarrollo, nunca forzado
         ),
         Usuario(
@@ -795,6 +813,7 @@ def seed_initial_data(db: Session):
             password_hash=pwd_hash,
             rol=RolUsuario.ENCARGADO,
             sucursal_id=sucursales[0].id,
+            empresa_id=empresa.id,
         ),
         Usuario(
             nombre_completo="Operador Cocina",
@@ -802,6 +821,7 @@ def seed_initial_data(db: Session):
             password_hash=pwd_hash,
             rol=RolUsuario.OPERADOR,
             sucursal_id=sucursales[0].id,
+            empresa_id=empresa.id,
         ),
         Usuario(
             nombre_completo="Chef Norte",
@@ -809,6 +829,7 @@ def seed_initial_data(db: Session):
             password_hash=pwd_hash,
             rol=RolUsuario.ENCARGADO,
             sucursal_id=sucursales[1].id,
+            empresa_id=empresa.id,
         ),
     ]
     db.add_all(usuarios)
@@ -872,6 +893,7 @@ class StockSucursal(Base, TenantMixin):
     stock_actual = Column(Float, nullable=False, default=0.0)
     created_at = Column(DateTime, default=func.now())
     updated_at = Column(DateTime, default=func.now(), onupdate=func.now())
+    ultima_actualizacion = Column(DateTime, default=func.now(), onupdate=func.now())
 
     # Relaciones
     ingrediente = relationship("IngredienteStock")

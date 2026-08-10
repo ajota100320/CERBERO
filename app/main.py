@@ -12,6 +12,7 @@ from jose import JWTError, jwt
 import bcrypt
 import os
 import httpx
+import uvicorn
 from dotenv import load_dotenv
 
 # ──────────────────────────────────────────────
@@ -260,18 +261,14 @@ async def get_super_admin_user(current_user: Usuario = Depends(require_roles(Rol
 
 async def require_auth(request: Request, db: Session = Depends(get_db)) -> Usuario:
     """Dependency que requiere usuario autenticado.
-    Para rutas web lanza HTTPException 303 con Location /login (FastAPI lo convierte en redirección).
+    Para rutas web retorna RedirectResponse 303 a /login.
     Para rutas /api/ lanza 401 JSON."""
     user = await get_current_user(request, db)
     if not user:
         if request.url.path.startswith("/api/"):
             raise HTTPException(status_code=401, detail="No autenticado")
-        # Redirección web: lanzar excepción corta el flujo del endpoint
-        # (un return de Response en una dependency NO corta, se pasa como valor al endpoint)
-        raise HTTPException(
-            status_code=status.HTTP_303_SEE_OTHER,
-            headers={"Location": "/login"},
-        )
+        # Redirección web: retornar RedirectResponse directamente (corta el flujo)
+        return RedirectResponse(url="/login", status_code=status.HTTP_303_SEE_OTHER)
     # ── SEGURIDAD PRIMER INGRESO ──────────────────────────────
     # Usuario con clave temporal (debe_cambiar_password=True) es
     # redirigido a /cambiar-password hasta completar el cambio.
@@ -2686,6 +2683,98 @@ async def checklist_ejecutar_create(
 
 if __name__ == "__main__":
     import uvicorn
+    
+
+# ──────────────────────────────────────────────
+# INCIDENCIAS - CREAR (para botón en operaciones.html)
+# ──────────────────────────────────────────────
+
+@app.get("/incidencias/nueva", response_class=HTMLResponse)
+async def new_incidencia_form(request: Request, db: Session = Depends(get_db), user: Usuario = Depends(require_auth)):
+    return templates.TemplateResponse(request=request, name="incidencia_form.html", context={
+        "request": request,
+        "incidencia": None,
+        "tipos": list(TipoIncidencia),
+        "severidades": list(Severidad),
+        "action": "/incidencias/nueva",
+        "title": "Reportar Incidencia",
+        "today": date.today().isoformat(),
+        "now": datetime.now().time().isoformat()[:5],
+    })
+
+@app.post("/incidencias/nueva")
+async def create_incidencia(
+    request: Request,
+    db: Session = Depends(get_db),
+    user: Usuario = Depends(require_auth),
+    tipo: str = Form(...),
+    titulo: str = Form(...),
+    descripcion: str = Form(""),
+    severidad: str = Form("Media"),
+):
+    incidencia = Incidencia(
+        tipo=TipoIncidencia(tipo),
+        titulo=titulo,
+        descripcion=descripcion or None,
+        severidad=Severidad(severidad),
+        reportado_por_id=user.id,
+        estado=EstadoIncidencia.ABIERTA,
+        fecha_reporte=func.now(),
+        empresa_id=user.empresa_id,
+    )
+    db.add(incidencia)
+    db.commit()
+    return RedirectResponse(url="/operaciones?ok=1", status_code=303)
+
+
+# ──────────────────────────────────────────────
+# CHECKLIST EJECUTAR (para botón en operaciones.html)
+# ──────────────────────────────────────────────
+
+@app.get("/checklist/{checklist_id}/ejecutar", response_class=HTMLResponse)
+async def ejecutar_checklist_form(request: Request, checklist_id: int, db: Session = Depends(get_db), user: Usuario = Depends(require_auth)):
+    checklist = db.query(ListaVerificacionDiario).filter(ListaVerificacionDiario.id == checklist_id).first()
+    if not checklist:
+        raise HTTPException(status_code=404, detail="Checklist no encontrado")
+    
+    return templates.TemplateResponse(request=request, name="checklist_ejecutar.html", context={
+        "request": request,
+        "checklist": checklist,
+        "user": user,
+        "today": date.today().isoformat(),
+        "now": datetime.now().time().isoformat()[:5],
+    })
+
+@app.post("/checklist/{checklist_id}/ejecutar")
+async def ejecutar_checklist_post(
+    checklist_id: int,
+    request: Request,
+    db: Session = Depends(get_db),
+    user: Usuario = Depends(require_auth),
+    estado: str = Form(...),
+    observaciones: str = Form(""),
+    firma: str = Form(""),
+):
+    checklist = db.query(ListaVerificacionDiario).filter(ListaVerificacionDiario.id == checklist_id).first()
+    if not checklist:
+        raise HTTPException(status_code=404, detail="Checklist no encontrado")
+    
+    # Crear registro de ejecución (EjecucionChecklist)
+    ejecucion = EjecucionChecklist(
+        checklist_id=checklist_id,
+        usuario_id=user.id,
+        fecha_ejecucion=date.today(),
+        hora_ejecucion=datetime.now().time(),
+        estado=EstadoEjecucion(estado),
+        observaciones=observaciones or None,
+        firma=firma or None,
+    )
+    db.add(ejecucion)
+    db.commit()
+    return RedirectResponse(url="/operaciones?ok=1", status_code=303)
+
+
+if __name__ == "__main__":
     uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=False)
 
 
