@@ -265,53 +265,13 @@ class Proveedor(Base, TenantMixin):
     def __repr__(self):
         return f"<Proveedor {self.nombre}>"
 
-class CategoriaInsumo(Base, TenantMixin):
-    """Categorías de insumos - Multi-Tenant real (cada empresa gestiona las suyas).
-    Reemplaza el enum fijo CategoriaIngrediente por una tabla editable por tenant."""
-    __tablename__ = "categorias_insumos"
-
-    id = Column(Integer, primary_key=True, index=True)
-    nombre = Column(String(150), nullable=False, index=True)
-    descripcion = Column(Text, nullable=True)
-    activo = Column(Boolean, default=True, index=True)
-    created_at = Column(DateTime, default=func.now())
-    updated_at = Column(DateTime, default=func.now(), onupdate=func.now())
-
-    # Relación inversa
-    ingredientes = relationship("IngredienteStock", back_populates="categoria_obj")
-
-    def __repr__(self):
-        return f"<CategoriaInsumo {self.nombre}>"
-
-
-class UnidadMedidaTabla(Base, TenantMixin):
-    """Unidades de medida editables - Multi-Tenant real (cada empresa gestiona las suyas).
-
-    Tabla paralela al enum fijo ``UnidadMedida`` (que sigue usándose en
-    ``IngredienteStock.unidad_medida``). Nombre de clase distinto a propósito
-    para NO colisionar con el enum homónimo ya existente.
-    """
-    __tablename__ = "unidades_medida"
-
-    id = Column(Integer, primary_key=True, index=True)
-    nombre = Column(String(100), nullable=False, index=True)       # ej: "Kilogramo"
-    abreviatura = Column(String(20), nullable=False, index=True)   # ej: "Kg"
-    activo = Column(Boolean, default=True, index=True)
-    created_at = Column(DateTime, default=func.now())
-    updated_at = Column(DateTime, default=func.now(), onupdate=func.now())
-
-    def __repr__(self):
-        return f"<UnidadMedidaTabla {self.nombre} ({self.abreviatura})>"
-
-
 class IngredienteStock(Base, TenantMixin):
     """Tabla maestra de inventario - Recibe actualizaciones automáticas de entradas/salidas"""
     __tablename__ = "ingredientes_stock"
 
     id = Column(Integer, primary_key=True, index=True)
     nombre = Column(String(200), nullable=False, index=True)
-    # FK a la tabla de categorías (reemplaza el enum fijo CategoriaIngrediente)
-    categoria_id = Column(Integer, ForeignKey("categorias_insumos.id"), nullable=True, index=True)
+    categoria = Column(SQLEnum(CategoriaIngrediente), nullable=False, default=CategoriaIngrediente.OTROS)
     unidad_medida = Column(SQLEnum(UnidadMedida), nullable=False, default=UnidadMedida.KG)
 
     # Stock actual con precisión decimal (evita redondeos - crítico en cocina)
@@ -334,7 +294,6 @@ class IngredienteStock(Base, TenantMixin):
     # Relaciones
     detalles_compra = relationship("DetalleCompra", back_populates="ingrediente")
     mermas = relationship("RegistroMerma", back_populates="ingrediente")
-    categoria_obj = relationship("CategoriaInsumo", back_populates="ingredientes", foreign_keys=[categoria_id])
 
     @property
     def necesita_reposicion(self) -> bool:
@@ -878,50 +837,34 @@ def seed_initial_data(db: Session):
 
     # 3. PROVEEDORES
     proveedores = [
-        Proveedor(nombre="Distribuidora Central", contacto="Juan Pérez", telefono="+569****5678", email="ventas@distcentral.cl", empresa_id=empresa.id),
-        Proveedor(nombre="Frutas y Verduras El Huerto", contacto="María González", telefono="+569****4321", email="pedidos@elhuerto.cl", empresa_id=empresa.id),
-        Proveedor(nombre="Carnes Premium S.A.", contacto="Carlos Ruiz", telefono="+569****4455", email="comercial@carnespremium.cl", empresa_id=empresa.id),
-        Proveedor(nombre="Lácteos del Sur", contacto="Ana Torres", telefono="+569****5566", email="ventas@lacteossur.cl", empresa_id=empresa.id),
+        Proveedor(nombre="Distribuidora Central", contacto="Juan Pérez", telefono="+569****5678", email="ventas@distcentral.cl"),
+        Proveedor(nombre="Frutas y Verduras El Huerto", contacto="María González", telefono="+569****4321", email="pedidos@elhuerto.cl"),
+        Proveedor(nombre="Carnes Premium S.A.", contacto="Carlos Ruiz", telefono="+569****4455", email="comercial@carnespremium.cl"),
+        Proveedor(nombre="Lácteos del Sur", contacto="Ana Torres", telefono="+569****5566", email="ventas@lacteossur.cl"),
     ]
     db.add_all(proveedores)
     db.flush()
 
-    # 4. CATEGORÍAS DE INSUMOS (multi-tenant: sembradas para la empresa creada)
-    categorias = [
-        CategoriaInsumo(nombre="Carnes", descripcion="Carnes rojas, blancas y embutidos", empresa_id=empresa.id),
-        CategoriaInsumo(nombre="Verduras", descripcion="Hortalizas y verduras frescas", empresa_id=empresa.id),
-        CategoriaInsumo(nombre="Frutas", descripcion="Frutas frescas", empresa_id=empresa.id),
-        CategoriaInsumo(nombre="Lácteos", descripcion="Lácteos y derivados", empresa_id=empresa.id),
-        CategoriaInsumo(nombre="Granos y Cereales", descripcion="Arroz, legumbres y cereales", empresa_id=empresa.id),
-        CategoriaInsumo(nombre="Condimentos", descripcion="Especias y condimentos", empresa_id=empresa.id),
-        CategoriaInsumo(nombre="Bebidas", descripcion="Bebidas y jugos", empresa_id=empresa.id),
-        CategoriaInsumo(nombre="Otros", descripcion="Otros insumos", empresa_id=empresa.id),
-    ]
-    db.add_all(categorias)
-    db.flush()
-    cat = {c.nombre: c.id for c in categorias}
-
-    # 5. INGREDIENTES BASE (referencian categoria_id multi-tenant)
+    # 4. INGREDIENTES BASE
     ingredientes = [
-        IngredienteStock(nombre="Tomate", categoria_id=cat["Verduras"], unidad_medida=UnidadMedida.KG, stock_actual=15.5, stock_minimo=5.0, costo_unitario=1200, costo_promedio=1200, empresa_id=empresa.id),
-        IngredienteStock(nombre="Cebolla", categoria_id=cat["Verduras"], unidad_medida=UnidadMedida.KG, stock_actual=20.0, stock_minimo=8.0, costo_unitario=800, costo_promedio=800, empresa_id=empresa.id),
-        IngredienteStock(nombre="Pollo Pechuga", categoria_id=cat["Carnes"], unidad_medida=UnidadMedida.KG, stock_actual=10.0, stock_minimo=5.0, costo_unitario=4500, costo_promedio=4500, empresa_id=empresa.id),
-        IngredienteStock(nombre="Arroz", categoria_id=cat["Granos y Cereales"], unidad_medida=UnidadMedida.KG, stock_actual=50.0, stock_minimo=10.0, costo_unitario=1100, costo_promedio=1100, empresa_id=empresa.id),
-        IngredienteStock(nombre="Aceite Oliva", categoria_id=cat["Condimentos"], unidad_medida=UnidadMedida.L, stock_actual=8.0, stock_minimo=3.0, costo_unitario=6500, costo_promedio=6500, empresa_id=empresa.id),
-        IngredienteStock(nombre="Leche Entera", categoria_id=cat["Lácteos"], unidad_medida=UnidadMedida.L, stock_actual=24.0, stock_minimo=12.0, costo_unitario=950, costo_promedio=950, empresa_id=empresa.id),
-        IngredienteStock(nombre="Queso Mozzarella", categoria_id=cat["Lácteos"], unidad_medida=UnidadMedida.KG, stock_actual=5.0, stock_minimo=2.0, costo_unitario=5800, costo_promedio=5800, empresa_id=empresa.id),
-        IngredienteStock(nombre="Pimiento Rojo", categoria_id=cat["Verduras"], unidad_medida=UnidadMedida.KG, stock_actual=8.0, stock_minimo=3.0, costo_unitario=2200, costo_promedio=2200, empresa_id=empresa.id),
+        IngredienteStock(nombre="Tomate", categoria=CategoriaIngrediente.VERDURAS, unidad_medida=UnidadMedida.KG, stock_actual=15.5, stock_minimo=5.0, costo_unitario=1200, costo_promedio=1200),
+        IngredienteStock(nombre="Cebolla", categoria=CategoriaIngrediente.VERDURAS, unidad_medida=UnidadMedida.KG, stock_actual=20.0, stock_minimo=8.0, costo_unitario=800, costo_promedio=800),
+        IngredienteStock(nombre="Pollo Pechuga", categoria=CategoriaIngrediente.CARNES, unidad_medida=UnidadMedida.KG, stock_actual=10.0, stock_minimo=5.0, costo_unitario=4500, costo_promedio=4500),
+        IngredienteStock(nombre="Arroz", categoria=CategoriaIngrediente.GRANOS, unidad_medida=UnidadMedida.KG, stock_actual=50.0, stock_minimo=10.0, costo_unitario=1100, costo_promedio=1100),
+        IngredienteStock(nombre="Aceite Oliva", categoria=CategoriaIngrediente.CONDIMENTOS, unidad_medida=UnidadMedida.L, stock_actual=8.0, stock_minimo=3.0, costo_unitario=6500, costo_promedio=6500),
+        IngredienteStock(nombre="Leche Entera", categoria=CategoriaIngrediente.LACTEOS, unidad_medida=UnidadMedida.L, stock_actual=24.0, stock_minimo=12.0, costo_unitario=950, costo_promedio=950),
+        IngredienteStock(nombre="Queso Mozzarella", categoria=CategoriaIngrediente.LACTEOS, unidad_medida=UnidadMedida.KG, stock_actual=5.0, stock_minimo=2.0, costo_unitario=5800, costo_promedio=5800),
+        IngredienteStock(nombre="Pimiento Rojo", categoria=CategoriaIngrediente.VERDURAS, unidad_medida=UnidadMedida.KG, stock_actual=8.0, stock_minimo=3.0, costo_unitario=2200, costo_promedio=2200),
     ]
     db.add_all(ingredientes)
 
-    # 6. NOTIFICACIONES DE EJEMPLO
+    # 5. NOTIFICACIONES DE EJEMPLO
     notificaciones = [
         Notificacion(
             usuario_id=usuarios[0].id,
             titulo="Bienvenido al ERP",
             mensaje="Sistema inicializado correctamente. Comienza a registrar tus operaciones.",
             tipo=TipoNotificacion.TAREA,
-            empresa_id=empresa.id,
         ),
         Notificacion(
             usuario_id=usuarios[1].id,
@@ -930,13 +873,12 @@ def seed_initial_data(db: Session):
             tipo=TipoNotificacion.ALERTA,
             entidad_relacionada="ingrediente",
             entidad_id=1,
-            empresa_id=empresa.id,
         ),
     ]
     db.add_all(notificaciones)
 
     db.commit()
-    print("✅ Datos iniciales cargados (categorías, sucursales, usuarios, proveedores, ingredientes, notificaciones)")
+    print("✅ Datos iniciales cargados (sucursales, usuarios, proveedores, ingredientes, notificaciones)")
 
 
 

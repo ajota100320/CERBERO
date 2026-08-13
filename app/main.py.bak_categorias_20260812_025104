@@ -42,7 +42,7 @@ from app.database import (
     RegistroMerma, ControlGasto, ListaVerificacionDiario,
     HigienePersonal, RegistroTemperatura,
     Usuario, Notificacion, Sucursal, Empresa, RolUsuario, TipoNotificacion,
-    CategoriaInsumo, UnidadMedida, EstadoAprobacion,
+    CategoriaIngrediente, UnidadMedida, EstadoAprobacion,
     TipoGasto, TipoMerma, TipoChecklist,
     Prioridad, Requerimientos
 )
@@ -307,7 +307,7 @@ async def notificar_stock_critico(db: Session):
             f"📦 <b>{item.nombre}</b>\n"
             f"Stock actual: {item.stock_actual} {item.unidad_medida.value}\n"
             f"Stock mínimo: {item.stock_minimo} {item.unidad_medida.value}\n"
-            f"Categoría: {item.categoria_obj.nombre if item.categoria_obj else 'Sin categoría'}"
+            f"Categoría: {item.categoria.value}"
         )
         for user in usuarios_alerta:
             await crear_notificacion_y_telegram(
@@ -533,7 +533,7 @@ async def api_stock_critico(db: Session = Depends(get_db), user: Usuario = Depen
         "stock_actual": i.stock_actual,
         "stock_minimo": i.stock_minimo,
         "unidad": i.unidad_medida.value,
-        "categoria": i.categoria_obj.nombre if i.categoria_obj else "Sin categoría"
+        "categoria": i.categoria.value
     } for i in items]
 
 @app.get("/api/temperaturas/alertas")
@@ -564,11 +564,8 @@ async def health_check():
 # ──────────────────────────────────────────────
 # INCLUDE ROUTERS
 # ──────────────────────────────────────────────
-from app.routers import insumos, categorias, proveedores, unidades
+from app.routers import insumos
 app.include_router(insumos.router)
-app.include_router(categorias.router)
-app.include_router(proveedores.router)
-app.include_router(unidades.router)
 
 # ──────────────────────────────────────────────
 # ENTRY POINT

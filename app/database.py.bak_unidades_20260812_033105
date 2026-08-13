@@ -284,26 +284,6 @@ class CategoriaInsumo(Base, TenantMixin):
         return f"<CategoriaInsumo {self.nombre}>"
 
 
-class UnidadMedidaTabla(Base, TenantMixin):
-    """Unidades de medida editables - Multi-Tenant real (cada empresa gestiona las suyas).
-
-    Tabla paralela al enum fijo ``UnidadMedida`` (que sigue usándose en
-    ``IngredienteStock.unidad_medida``). Nombre de clase distinto a propósito
-    para NO colisionar con el enum homónimo ya existente.
-    """
-    __tablename__ = "unidades_medida"
-
-    id = Column(Integer, primary_key=True, index=True)
-    nombre = Column(String(100), nullable=False, index=True)       # ej: "Kilogramo"
-    abreviatura = Column(String(20), nullable=False, index=True)   # ej: "Kg"
-    activo = Column(Boolean, default=True, index=True)
-    created_at = Column(DateTime, default=func.now())
-    updated_at = Column(DateTime, default=func.now(), onupdate=func.now())
-
-    def __repr__(self):
-        return f"<UnidadMedidaTabla {self.nombre} ({self.abreviatura})>"
-
-
 class IngredienteStock(Base, TenantMixin):
     """Tabla maestra de inventario - Recibe actualizaciones automáticas de entradas/salidas"""
     __tablename__ = "ingredientes_stock"

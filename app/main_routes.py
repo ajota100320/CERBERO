@@ -326,7 +326,7 @@ async def api_stock_critico(db: Session = Depends(get_db)):
         "stock_actual": i.stock_actual,
         "stock_minimo": i.stock_minimo,
         "unidad": i.unidad_medida.value,
-        "categoria": i.categoria.value
+        "categoria": i.categoria_obj.nombre if i.categoria_obj else "Sin categoría"
     } for i in items]
 
 
