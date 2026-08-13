@@ -44,7 +44,7 @@ from app.database import (
     Usuario, Notificacion, Sucursal, Empresa, RolUsuario, TipoNotificacion,
     CategoriaInsumo, UnidadMedida, EstadoAprobacion,
     TipoGasto, TipoMerma, TipoChecklist,
-    Prioridad, Requerimientos
+    Prioridad, Requerimiento, EstadoRequerimiento, DetalleRequerimiento
 )
 # ── FASE 4: OPERACIONES AVANZADAS ──
 from app.database import (
@@ -564,11 +564,12 @@ async def health_check():
 # ──────────────────────────────────────────────
 # INCLUDE ROUTERS
 # ──────────────────────────────────────────────
-from app.routers import insumos, categorias, proveedores, unidades
+from app.routers import insumos, categorias, proveedores, unidades, requerimientos
 app.include_router(insumos.router)
 app.include_router(categorias.router)
 app.include_router(proveedores.router)
 app.include_router(unidades.router)
+app.include_router(requerimientos.router)
 
 # ──────────────────────────────────────────────
 # ENTRY POINT
