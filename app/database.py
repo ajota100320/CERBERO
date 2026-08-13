@@ -561,20 +561,56 @@ class Severidad(str, enum.Enum):
     ALTA = "Alta"
     CRITICA = "Crítica"
 
-class Requerimientos(Base, TenantMixin):
+class EstadoRequerimiento(str, enum.Enum):
+    PENDIENTE = "PENDIENTE"
+    CONSOLIDADO = "CONSOLIDADO"
+    COMPRADO = "COMPRADO"
+
+
+class Requerimiento(Base, TenantMixin):
+    """Requerimiento de compra multi-sucursal (Vista Cocina → Consolidación Administración).
+
+    Multi-Tenant jerárquico: cada requerimiento pertenece a una empresa (TenantMixin)
+    y a una sucursal (sucursal_id). La consolidación agrupa los 'PENDIENTE' de todas
+    las sucursales de la misma empresa.
+    """
     __tablename__ = "requerimientos"
+
     id = Column(Integer, primary_key=True, index=True)
-    producto = Column(String(200), nullable=False)
-    cantidad = Column(Float, nullable=False)
-    precio_estimado = Column(Float, nullable=False)
-    prioridad = Column(SQLEnum(Prioridad), nullable=False)
-    sucursal_id = Column(Integer, ForeignKey("sucursales.id"), nullable=False)
-    fecha_registro = Column(DateTime, default=func.now())
-    # Relationship
+    sucursal_id = Column(Integer, ForeignKey("sucursales.id"), nullable=False, index=True)
+    fecha_solicitud = Column(DateTime, nullable=False, default=func.now(), index=True)
+    estado = Column(SQLEnum(EstadoRequerimiento), nullable=False, default=EstadoRequerimiento.PENDIENTE, index=True)
+    usuario_id = Column(Integer, ForeignKey("usuarios.id"), nullable=False)
+    created_at = Column(DateTime, default=func.now())
+
+    # Relaciones
     sucursal = relationship("Sucursal")
+    usuario = relationship("Usuario")
+    detalles = relationship("DetalleRequerimiento", back_populates="requerimiento", cascade="all, delete-orphan")
 
     def __repr__(self):
-        return f"<Requerimiento {self.producto} x{self.cantidad}>"
+        return f"<Requerimiento #{self.id} sucursal={self.sucursal_id} estado={self.estado}>"
+
+
+class DetalleRequerimiento(Base):
+    """Línea de un requerimiento: insumo solicitado + cantidad.
+
+    Se filtra a nivel de su padre (Requerimiento) para mantener el aislamiento
+    multi-tenant: nunca se consulta sin pasar por el requerimiento al que pertenece.
+    """
+    __tablename__ = "detalle_requerimientos"
+
+    id = Column(Integer, primary_key=True, index=True)
+    requerimiento_id = Column(Integer, ForeignKey("requerimientos.id"), nullable=False, index=True)
+    insumo_id = Column(Integer, ForeignKey("ingredientes_stock.id"), nullable=False, index=True)
+    cantidad_solicitada = Column(Float, nullable=False, default=0.0)
+
+    # Relaciones
+    requerimiento = relationship("Requerimiento", back_populates="detalles")
+    insumo = relationship("IngredienteStock")
+
+    def __repr__(self):
+        return f"<DetalleRequerimiento req={self.requerimiento_id} insumo={self.insumo_id} x{self.cantidad_solicitada}>"
 
 # ──────────────────────────────────────────────
 # MODELOS CONTINUACIÓN (HigienePersonal, RegistroTemperatura)
