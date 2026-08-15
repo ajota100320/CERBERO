@@ -408,6 +408,8 @@ class RegistroMerma(Base, TenantMixin):
 
     id = Column(Integer, primary_key=True, index=True)
     ingrediente_id = Column(Integer, ForeignKey("ingredientes_stock.id"), nullable=False)
+    # FASE 5: sucursal donde ocurre la merma (multi-sucursal jerárquico).
+    sucursal_id = Column(Integer, ForeignKey("sucursales.id"), nullable=True, index=True)
 
     tipo = Column(SQLEnum(TipoMerma), nullable=False, default=TipoMerma.VENCIMIENTO)
     cantidad = Column(Float, nullable=False)  # Cantidad perdida (Decimal)
@@ -429,6 +431,7 @@ class RegistroMerma(Base, TenantMixin):
 
     # Relaciones
     ingrediente = relationship("IngredienteStock", back_populates="mermas")
+    sucursal = relationship("Sucursal")
     responsable_usuario = relationship("Usuario", back_populates="mermas_registradas", foreign_keys=[responsable_usuario_id])
     aprobador_usuario = relationship("Usuario", back_populates="mermas_aprobadas", foreign_keys=[aprobado_por_usuario_id])
 
@@ -565,6 +568,7 @@ class EstadoRequerimiento(str, enum.Enum):
     PENDIENTE = "PENDIENTE"
     CONSOLIDADO = "CONSOLIDADO"
     COMPRADO = "COMPRADO"
+    RECIBIDO = "RECIBIDO"
 
 
 class Requerimiento(Base, TenantMixin):
@@ -1102,6 +1106,221 @@ class AjusteInventario(Base, TenantMixin):
 
     def __repr__(self):
         return f"<AjusteInventario conteo={self.conteo_id} ingrediente={self.ingrediente_id} ajuste={self.valor_ajuste}>"
+
+
+# ──────────────────────────────────────────────
+# MOTOR DE PRODUCCIÓN (BOM - Bill of Materials)
+# ──────────────────────────────────────────────
+class Receta(Base, TenantMixin):
+    """Ficha técnica maestra (Bill of Materials). Pertenece a la Empresa.
+
+    Cada Receta define una lista de insumos (DetalleReceta) y un rendimiento
+    base. La ejecución (HistorialProduccion) descuenta stock de la Sucursal
+    (StockSucursal) y del global (IngredienteStock), y registra el costo real.
+    """
+    __tablename__ = "recetas"
+
+    id = Column(Integer, primary_key=True, index=True)
+    nombre = Column(String(200), nullable=False, index=True)
+    descripcion = Column(Text, nullable=True)
+    # Cantidad de producto terminado que produce UNA ejecución base (1 multiplicador).
+    rendimiento_base = Column(Float, nullable=False, default=1.0)
+    created_at = Column(DateTime, default=func.now())
+    updated_at = Column(DateTime, default=func.now(), onupdate=func.now())
+
+    # Relaciones
+    detalles = relationship(
+        "DetalleReceta",
+        back_populates="receta",
+        cascade="all, delete-orphan",
+        order_by="DetalleReceta.id",
+    )
+    historial = relationship("HistorialProduccion", back_populates="receta")
+
+    def __repr__(self):
+        return f"<Receta {self.nombre}>"
+
+
+class DetalleReceta(Base, TenantMixin):
+    """Línea de insumo de una Receta: cuánto se necesita de cada ingrediente."""
+    __tablename__ = "detalle_recetas"
+
+    id = Column(Integer, primary_key=True, index=True)
+    receta_id = Column(Integer, ForeignKey("recetas.id", ondelete="CASCADE"), nullable=False, index=True)
+    insumo_id = Column(Integer, ForeignKey("ingredientes_stock.id"), nullable=False, index=True)
+    cantidad_necesaria = Column(Float, nullable=False, default=0.0)
+
+    # Relaciones
+    receta = relationship("Receta", back_populates="detalles")
+    insumo = relationship("IngredienteStock")
+
+    def __repr__(self):
+        return f"<DetalleReceta receta={self.receta_id} insumo={self.insumo_id} x{self.cantidad_necesaria}>"
+
+
+class HistorialProduccion(Base, TenantMixin):
+    """Registro de una ejecución de producción: qué se produjo, cuánto costó y en qué sucursal."""
+    __tablename__ = "historial_produccion"
+
+    id = Column(Integer, primary_key=True, index=True)
+    receta_id = Column(Integer, ForeignKey("recetas.id"), nullable=False, index=True)
+    sucursal_id = Column(Integer, ForeignKey("sucursales.id"), nullable=False, index=True)
+    cantidad_producida = Column(Float, nullable=False, default=0.0)
+    costo_total_calculado = Column(Float, nullable=False, default=0.0)
+    fecha = Column(DateTime, nullable=False, default=func.now(), index=True)
+    usuario_id = Column(Integer, ForeignKey("usuarios.id"), nullable=False)
+    created_at = Column(DateTime, default=func.now())
+
+    # Relaciones
+    receta = relationship("Receta", back_populates="historial")
+    sucursal = relationship("Sucursal")
+    usuario = relationship("Usuario")
+
+    def __repr__(self):
+        return f"<HistorialProduccion receta={self.receta_id} sucursal={self.sucursal_id} x{self.cantidad_producida}>"
+
+
+# ──────────────────────────────────────────────
+# MÓDULO A: RECURSOS HUMANOS Y CONTROL DE ASISTENCIA
+# ──────────────────────────────────────────────
+class Empleado(Base, TenantMixin):
+    """Empleado del negocio.
+
+    Multi-Tenant jerárquico: pertenece a una Empresa (TenantMixin) y a una
+    Sucursal (sucursal_id). Reloj de control (TurnoAsistencia) cuelga de él.
+    """
+    __tablename__ = "empleados"
+
+    id = Column(Integer, primary_key=True, index=True)
+    nombre = Column(String(150), nullable=False, index=True)
+    cargo = Column(String(100), nullable=True, index=True)
+    # FK → Sucursal (la sucursal a la que está asignado). La empresa_id la
+    # inyecta TenantMixin (aislamiento multi-tenant físico).
+    sucursal_id = Column(Integer, ForeignKey("sucursales.id"), nullable=False, index=True)
+    activo = Column(Boolean, default=True, index=True)
+    created_at = Column(DateTime, default=func.now())
+    updated_at = Column(DateTime, default=func.now(), onupdate=func.now())
+
+    # Relaciones
+    sucursal = relationship("Sucursal")
+    turnos = relationship(
+        "TurnoAsistencia",
+        back_populates="empleado",
+        cascade="all, delete-orphan",
+        order_by="TurnoAsistencia.fecha",
+    )
+
+    def __repr__(self):
+        return f"<Empleado {self.nombre} ({self.cargo or 'Sin cargo'})>"
+
+
+class TurnoAsistencia(Base):
+    """Registro de marcación de entrada/salida de un empleado en un día.
+
+    NO es TenantMixin a propósito: se accede SIEMPRE vía su empleado padre
+    (Empleado es tenant-aware), de modo que el aislamiento multi-empresa se
+    hereda por relación, igual que DetalleRequerimiento → Requerimiento.
+    """
+    __tablename__ = "turnos_asistencia"
+
+    id = Column(Integer, primary_key=True, index=True)
+    empleado_id = Column(Integer, ForeignKey("empleados.id"), nullable=False, index=True)
+    fecha = Column(Date, nullable=False, default=date.today, index=True)
+    hora_entrada = Column(DateTime, nullable=True)
+    hora_salida = Column(DateTime, nullable=True)
+
+    # Relaciones
+    empleado = relationship("Empleado", back_populates="turnos")
+
+    @property
+    def abierto(self) -> bool:
+        """True si tiene entrada marcada pero aún no salida (turno abierto)."""
+        return self.hora_entrada is not None and self.hora_salida is None
+
+    def __repr__(self):
+        return f"<TurnoAsistencia emp={self.empleado_id} {self.fecha} {'abierto' if self.abierto else 'cerrado'}>"
+
+
+# ──────────────────────────────────────────────
+# MÓDULO B: CHECKLISTS DE OPERACIÓN
+# ──────────────────────────────────────────────
+class PlantillaChecklist(Base, TenantMixin):
+    """Plantilla de checklist operativo (ej: 'Apertura de Cocina', 'Cierre').
+
+    Multi-Tenant jerárquico: pertenece a la Empresa (TenantMixin). Contiene
+    un conjunto ordenado de TareaChecklist.
+    """
+    __tablename__ = "plantillas_checklist"
+
+    id = Column(Integer, primary_key=True, index=True)
+    titulo = Column(String(200), nullable=False, index=True)
+    descripcion = Column(Text, nullable=True)
+    activo = Column(Boolean, default=True, index=True)
+    created_at = Column(DateTime, default=func.now())
+    updated_at = Column(DateTime, default=func.now(), onupdate=func.now())
+
+    # Relaciones
+    tareas = relationship(
+        "TareaChecklist",
+        back_populates="plantilla",
+        cascade="all, delete-orphan",
+        order_by="TareaChecklist.id",
+    )
+    ejecuciones = relationship(
+        "EjecucionPlantilla",
+        back_populates="plantilla",
+        cascade="all, delete-orphan",
+    )
+
+    def __repr__(self):
+        return f"<PlantillaChecklist {self.titulo} ({len(self.tareas)} tareas)>"
+
+
+class TareaChecklist(Base):
+    """Tarea/ítem de una PlantillaChecklist.
+
+    NO es TenantMixin: se accede SIEMPRE vía su plantilla padre (que sí es
+    tenant-aware), de modo que el aislamiento multi-empresa se hereda por
+    relación (misma estrategia que DetalleRequerimiento → Requerimiento).
+    """
+    __tablename__ = "tareas_checklist"
+
+    id = Column(Integer, primary_key=True, index=True)
+    plantilla_id = Column(Integer, ForeignKey("plantillas_checklist.id", ondelete="CASCADE"), nullable=False, index=True)
+    descripcion = Column(String(300), nullable=False)
+
+    # Relaciones
+    plantilla = relationship("PlantillaChecklist", back_populates="tareas")
+
+    def __repr__(self):
+        return f"<TareaChecklist {self.descripcion[:40]}>"
+
+
+class EjecucionPlantilla(Base, TenantMixin):
+    """Ejecución real de una PlantillaChecklist en una Sucursal y fecha.
+
+    NOTA DE NOMBRE: el SOP original la llamaba 'EjecucionChecklist', pero esa
+    clase ya existe (Fase 4) con tabla 'ejecuciones_checklist' migrada y schema
+    distinto. Para NO colisionar ni romper la BD existente, este módulo usa el
+    nombre 'EjecucionPlantilla' (tabla 'ejecuciones_plantillas') con el schema
+    pedido: plantilla_id + sucursal_id + fecha_ejecucion + completado.
+    """
+    __tablename__ = "ejecuciones_plantillas"
+
+    id = Column(Integer, primary_key=True, index=True)
+    plantilla_id = Column(Integer, ForeignKey("plantillas_checklist.id"), nullable=False, index=True)
+    sucursal_id = Column(Integer, ForeignKey("sucursales.id"), nullable=False, index=True)
+    fecha_ejecucion = Column(DateTime, nullable=False, default=func.now(), index=True)
+    completado = Column(Boolean, nullable=False, default=False, index=True)
+    observaciones = Column(Text, nullable=True)
+    created_at = Column(DateTime, default=func.now())
+
+    # Relaciones
+    plantilla = relationship("PlantillaChecklist", back_populates="ejecuciones")
+    sucursal = relationship("Sucursal")
+
+    def __repr__(self):
+        return f"<EjecucionPlantilla plantilla={self.plantilla_id} sucursal={self.sucursal_id} {'✔' if self.completado else '○'}>"
 
 
 if __name__ == "__main__":

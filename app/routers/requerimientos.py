@@ -19,7 +19,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from sqlalchemy import func, distinct
 
-from app.main import require_auth
+from app.main import require_auth, require_admin
 from app.database import (
     get_db,
     Requerimiento,
@@ -28,6 +28,7 @@ from app.database import (
     Sucursal,
     EstadoRequerimiento,
     UnidadMedida,
+    StockSucursal,
 )
 
 router = APIRouter(prefix="/api/v1/requerimientos", tags=["Requerimientos"])
@@ -229,3 +230,108 @@ async def consolidados(
     ]
 
     return resultado
+
+
+# ══════════════════════════════════════════════════
+# POST: Cierre del ciclo de compras — Recepción y distribución de stock.
+# Administración confirma que la compra global fue realizada. El endpoint:
+#   1) Busca los requerimientos PENDIENTE / CONSOLIDADO de la empresa.
+#   2) Itera sobre cada DetalleRequerimiento.
+#   3) SUMA la cantidad comprada al stock del insumo en la sucursal que ORIGINÓ
+#      el pedido (StockSucursal por sucursal_id + total global en IngredienteStock).
+#      (Lira pidió 5 y Vitacura 3 → +5 a Lira, +3 a Vitacura.)
+#   4) Cambia el estado de los requerimientos a 'RECIBIDO'.
+# Todo dentro de UN SOLO bloque db.commit() para evitar datos huérfanos.
+# ══════════════════════════════════════════════════
+@router.post("/recibir", status_code=status.HTTP_200_OK)
+async def recibir_compra_global(
+    current_user=Depends(require_admin),  # Solo Administración / Super Admin
+    db: Session = Depends(get_db),
+):
+    empresa_id = current_user.empresa_id
+
+    # 1. Requerimientos pendientes de recibir (PENDIENTE o CONSOLIDADO) del tenant.
+    requisitos = (
+        db.query(Requerimiento)
+        .filter(
+            Requerimiento.empresa_id == empresa_id,
+            Requerimiento.estado.in_([
+                EstadoRequerimiento.PENDIENTE,
+                EstadoRequerimiento.CONSOLIDADO,
+            ]),
+        )
+        .all()
+    )
+
+    if not requisitos:
+        raise HTTPException(
+            status_code=404,
+            detail="No hay requerimientos PENDIENTES o CONSOLIDADOS por recibir",
+        )
+
+    resumen_sucursales: dict[int, dict] = {}  # sucursal_id -> {nombre, cant_total}
+    insumos_afectados = 0
+
+    # 2. Iterar requerimientos → 3. distribuir stock → 4. cambiar estado.
+    for req in requisitos:
+        # Forzar carga de detalles dentro del tenant (aislamiento por relación).
+        detalles = (
+            db.query(DetalleRequerimiento)
+            .filter(DetalleRequerimiento.requerimiento_id == req.id)
+            .all()
+        )
+        for det in detalles:
+            # ── Stock POR SUCURSAL (la que originó el pedido) ──
+            stock_suc = (
+                db.query(StockSucursal)
+                .filter(
+                    StockSucursal.empresa_id == empresa_id,
+                    StockSucursal.ingrediente_id == det.insumo_id,
+                    StockSucursal.sucursal_id == req.sucursal_id,
+                )
+                .first()
+            )
+            if not stock_suc:
+                stock_suc = StockSucursal(
+                    empresa_id=empresa_id,
+                    ingrediente_id=det.insumo_id,
+                    sucursal_id=req.sucursal_id,
+                    stock_actual=0.0,
+                )
+                db.add(stock_suc)
+            stock_suc.stock_actual = (stock_suc.stock_actual or 0.0) + det.cantidad_solicitada
+
+            # ── Stock GLOBAL (IngredienteStock) para la vista central ──
+            insumo = (
+                db.query(IngredienteStock)
+                .filter(
+                    IngredienteStock.id == det.insumo_id,
+                    IngredienteStock.empresa_id == empresa_id,
+                )
+                .first()
+            )
+            if insumo:
+                insumo.stock_actual = (insumo.stock_actual or 0.0) + det.cantidad_solicitada
+
+            insumos_afectados += 1
+
+            # Resumen por sucursal (solo para la respuesta informativa).
+            res = resumen_sucursales.setdefault(req.sucursal_id, {
+                "sucursal_id": req.sucursal_id,
+                "nombre": req.sucursal.nombre if req.sucursal else f"Sucursal #{req.sucursal_id}",
+                "cantidad_total": 0.0,
+            })
+            res["cantidad_total"] += det.cantidad_solicitada
+
+        # 4. Cambiar estado.
+        req.estado = EstadoRequerimiento.RECIBIDO
+
+    # UN solo commit: si algo falla arriba, la transacción entera se revierte.
+    db.commit()
+
+    return {
+        "message": "Compra global recibida. Stock distribuido por sucursal.",
+        "requerimientos_recibidos": len(requisitos),
+        "insumos_afectados": insumos_afectados,
+        "sucursales": list(resumen_sucursales.values()),
+    }

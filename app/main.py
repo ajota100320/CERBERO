@@ -564,12 +564,17 @@ async def health_check():
 # ──────────────────────────────────────────────
 # INCLUDE ROUTERS
 # ──────────────────────────────────────────────
-from app.routers import insumos, categorias, proveedores, unidades, requerimientos
+from app.routers import insumos, categorias, proveedores, unidades, requerimientos, dashboard, produccion, rrhh, checklists, mermas
 app.include_router(insumos.router)
 app.include_router(categorias.router)
 app.include_router(proveedores.router)
 app.include_router(unidades.router)
 app.include_router(requerimientos.router)
+app.include_router(dashboard.router)
+app.include_router(produccion.router)
+app.include_router(rrhh.router)
+app.include_router(checklists.router)
+app.include_router(mermas.router)
 
 # ──────────────────────────────────────────────
 # ENTRY POINT

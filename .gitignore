@@ -13,8 +13,9 @@
 *.sqlite3
 
 # Respaldo de archivos de código (protocolo rollback)
-*.bak
-*.orig
+# Cubre *.bak, *.bak_defcon1, *.bak_createreceta_2026..., etc.
+*.bak*
+*.orig*
 
 # Python
 __pycache__/
