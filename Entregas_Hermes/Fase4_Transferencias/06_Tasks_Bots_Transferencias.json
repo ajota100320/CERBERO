@@ -1,0 +1,119 @@
+[
+  {
+    "TaskName": "Task_Notificar_Destino_Solicitud",
+    "Type": "Push Notification",
+    "Description": "Notifica a Encargado destino que hay nueva solicitud de transferencia",
+    "TableName": "Ordenes_Transferencia",
+    "Recipients": {
+      "Type": "Expression",
+      "Expression": "SELECT(Usuarios_Sucursales[Email], AND([Sucursal_ID] = [_THISROW].[Sucursal_Destino_ID], [Rol_Sucursal] = \"Encargado\", [Activo?] = TRUE))"
+    },
+    "Subject": "📦 Nueva solicitud de transferencia - {{[_THISROW].[Sucursal_Origen_ID].[Nombre]}} → {{[_THISROW].[Sucursal_Destino_ID].[Nombre]}}",
+    "Body": "El Encargado de **{{[_THISROW].[Sucursal_Origen_ID].[Nombre]}}** ha solicitado una transferencia:\n\n• **Origen:** {{[_THISROW].[Sucursal_Origen_ID].[Nombre]}}\n• **Destino:** {{[_THISROW].[Sucursal_Destino_ID].[Nombre]}}\n• **Solicitada por:** {{[_THISROW].[Solicitada_Por]}}\n• **Fecha:** {{[_THISROW].[Fecha_Solicitud]}}\n• **Items:** {{COUNT(FILTER(\"Items_Transferencia\", [Orden_ID] = [_THISROW].[Orden_ID]))}} ingredientes\n\n👉 Revisa y **Aprueba** o **Rechaza** en la app.",
+    "DeepLink": "appsheet://erp_gastronomico_pruebas/Ordenes_Transferencia/{{[_THISROW].[Orden_ID]}}"
+  },
+  {
+    "TaskName": "Task_Notificar_Origen_Aprobacion_Destino",
+    "Type": "Push Notification",
+    "Description": "Notifica a Encargado origen que destino aprobó la transferencia",
+    "TableName": "Ordenes_Transferencia",
+    "Recipients": {
+      "Type": "Expression",
+      "Expression": "SELECT(Usuarios_Sucursales[Email], AND([Sucursal_ID] = [_THISROW].[Sucursal_Origen_ID], [Rol_Sucursal] = \"Encargado\", [Activo?] = TRUE))"
+    },
+    "Subject": "✅ Transferencia APROBADA por destino - {{[_THISROW].[Orden_ID]}}",
+    "Body": "El Encargado de **{{[_THISROW].[Sucursal_Destino_ID].[Nombre]}}** ha **APROBADO** la transferencia:\n\n• **Orden:** {{[_THISROW].[Orden_ID]}}\n• **Aprobada por:** {{[_THISROW].[Aprobada_Destino_Por]}}\n• **Fecha:** {{[_THISROW].[Fecha_Aprobacion_Destino]}}\n\n➡️ Ahora puedes **Iniciar Preparación** de los items.",
+    "DeepLink": "appsheet://erp_gastronomico_pruebas/Ordenes_Transferencia/{{[_THISROW].[Orden_ID]}}"
+  },
+  {
+    "TaskName": "Task_Notificar_Preparacion_Iniciada",
+    "Type": "Push Notification",
+    "Description": "Notifica a Encargado destino que preparación empezó",
+    "TableName": "Ordenes_Transferencia",
+    "Recipients": {
+      "Type": "Expression",
+      "Expression": "SELECT(Usuarios_Sucursales[Email], AND([Sucursal_ID] = [_THISROW].[Sucursal_Destino_ID], [Rol_Sucursal] = \"Encargado\", [Activo?] = TRUE))"
+    },
+    "Subject": "📦 Preparación INICIADA - Transferencia {{[_THISROW].[Orden_ID]}}",
+    "Body": "La preparación de la transferencia **{{[_THISROW].[Orden_ID]}}** ha comenzado:\n\n• **Preparada por:** {{[_THISROW].[Preparada_Por]}}\n• **Fecha:** {{[_THISROW].[Fecha_Preparacion]}}\n• **Origen:** {{[_THISROW].[Sucursal_Origen_ID].[Nombre]}}\n\nPrepárate para recibir en las próximas horas.",
+    "DeepLink": "appsheet://erp_gastronomico_pruebas/Ordenes_Transferencia/{{[_THISROW].[Orden_ID]}}"
+  },
+  {
+    "TaskName": "Task_Notificar_Despacho_Realizado",
+    "Type": "Push Notification",
+    "Description": "Notifica a destino que mercancía fue despachada",
+    "TableName": "Ordenes_Transferencia",
+    "Recipients": {
+      "Type": "Expression",
+      "Expression": "SELECT(Usuarios_Sucursales[Email], AND([Sucursal_ID] = [_THISROW].[Sucursal_Destino_ID], [Rol_Sucursal] = \"Encargado\", [Activo?] = TRUE))"
+    },
+    "Subject": "🚚 DESPACHADA - Transferencia {{[_THISROW].[Orden_ID]}} en camino",
+    "Body": "La transferencia **{{[_THISROW].[Orden_ID]}}** ha sido **DESPACHADA**:\n\n• **Despachada por:** {{[_THISROW].[Despachada_Por]}}\n• **Fecha despacho:** {{[_THISROW].[Fecha_Despacho]}}\n• **Origen:** {{[_THISROW].[Sucursal_Origen_ID].[Nombre]}}\n• **Destino:** {{[_THISROW].[Sucursal_Destino_ID].[Nombre]}}\n• **Items:** {{COUNT(FILTER(\"Items_Transferencia\", [Orden_ID] = [_THISROW].[Orden_ID]))}}\n\n📦 **En tránsito** - Prepara recepción.",
+    "DeepLink": "appsheet://erp_gastronomico_pruebas/Ordenes_Transferencia/{{[_THISROW].[Orden_ID]}}"
+  },
+  {
+    "TaskName": "Task_Notificar_Recepcion_Completa",
+    "Type": "Push Notification",
+    "Description": "Notifica a origen que recepción completada (con o sin diferencias)",
+    "TableName": "Ordenes_Transferencia",
+    "Recipients": {
+      "Type": "Expression",
+      "Expression": "SELECT(Usuarios_Sucursales[Email], AND([Sucursal_ID] = [_THISROW].[Sucursal_Origen_ID], [Rol_Sucursal] = \"Encargado\", [Activo?] = TRUE))"
+    },
+    "Subject": "📥 RECEPCIÓN {{IF([_THISROW].[Estado] = \"Recibida_Completa\", \"COMPLETA\", \"CON DIFERENCIAS\")}} - {{[_THISROW].[Orden_ID]}}",
+    "Body": "La transferencia **{{[_THISROW].[Orden_ID]}}** ha sido **RECIBIDA** en **{{[_THISROW].[Sucursal_Destino_ID].[Nombre]}}**:\n\n• **Estado final:** {{[_THISROW].[Estado]}}\n• **Recibida por:** {{[_THISROW].[Recibida_Por]}}\n• **Fecha recepción:** {{[_THISROW].[Fecha_Recepcion]}}\n{{IF([_THISROW].[Estado] = \"Recibida_Con_Diferencias\", \"\\n⚠️ **Hay diferencias en recepción** - Revisar ajustes generados.\", \"\")}}\n\n✅ Transferencia cerrada.",
+    "DeepLink": "appsheet://erp_gastronomico_pruebas/Ordenes_Transferencia/{{[_THISROW].[Orden_ID]}}"
+  },
+  {
+    "TaskName": "Task_Alerta_Diferencias_Recepcion",
+    "Type": "Push Notification",
+    "Description": "Alerta a ambos Encargados si recepción tiene diferencias",
+    "TableName": "Ordenes_Transferencia",
+    "Recipients": {
+      "Type": "Expression",
+      "Expression": "UNIQUE(LIST(SELECT(Usuarios_Sucursales[Email], AND([Sucursal_ID] = [_THISROW].[Sucursal_Origen_ID], [Rol_Sucursal] = \"Encargado\", [Activo?] = TRUE)), SELECT(Usuarios_Sucursales[Email], AND([Sucursal_ID] = [_THISROW].[Sucursal_Destino_ID], [Rol_Sucursal] = \"Encargado\", [Activo?] = TRUE))))"
+    },
+    "Subject": "⚠️ DIFERENCIAS EN RECEPCIÓN - Transferencia {{[_THISROW].[Orden_ID]}}",
+    "Body": "La recepción de la transferencia **{{[_THISROW].[Orden_ID]}}** presenta **DIFERENCIAS**:\n\n• **Origen:** {{[_THISROW].[Sucursal_Origen_ID].[Nombre]}}\n• **Destino:** {{[_THISROW].[Sucursal_Destino_ID].[Nombre]}}\n• **Items con diferencias:** {{COUNT(FILTER(\"Recepciones_Transferencia\", AND([Orden_ID] = [_THISROW].[Orden_ID], [Estado_Recepcion] = \"Con_Diferencias\")))}}\n\n👉 Revisar items y generar ajustes de inventario si corresponde.",
+    "DeepLink": "appsheet://erp_gastronomico_pruebas/Ordenes_Transferencia/{{[_THISROW].[Orden_ID]}}"
+  },
+  {
+    "TaskName": "Task_Notificar_Todos_Preparados_Despachar",
+    "Type": "Push Notification",
+    "Description": "Cuando todos items preparados, avisa a Encargado origen para despachar",
+    "TableName": "Items_Transferencia",
+    "Recipients": {
+      "Type": "Expression",
+      "Expression": "SELECT(Usuarios_Sucursales[Email], AND([Sucursal_ID] = [_THISROW].[Orden_ID].[Sucursal_Origen_ID], [Rol_Sucursal] = \"Encargado\", [Activo?] = TRUE))"
+    },
+    "Subject": "✅ TODO PREPARADO - Listo para DESPACHAR {{[_THISROW].[Orden_ID].[Orden_ID]}}",
+    "Body": "Todos los items de la transferencia **{{[_THISROW].[Orden_ID].[Orden_ID]}}** están **PREPARADOS**:\n\n• **Items totales:** {{COUNT(FILTER(\"Items_Transferencia\", [Orden_ID] = [_THISROW].[Orden_ID].[Orden_ID]))}}\n• **Items preparados:** {{COUNT(FILTER(\"Items_Transferencia\", AND([Orden_ID] = [_THISROW].[Orden_ID].[Orden_ID], [Estado_Item] = \"Preparado\")))}}\n\n👉 Ejecuta **Despachar** para descontar stock origen y enviar.",
+    "DeepLink": "appsheet://erp_gastronomico_pruebas/Ordenes_Transferencia/{{[_THISROW].[Orden_ID].[Orden_ID]}}"
+  },
+  {
+    "TaskName": "Task_Alerta_Transferencia_Estancada",
+    "Type": "Push Notification",
+    "Description": "Alerta diaria a Encargados de transferencias sin avance > 24h",
+    "TableName": "Ordenes_Transferencia",
+    "Recipients": {
+      "Type": "Expression",
+      "Expression": "SELECT(Usuarios_Sucursales[Email], AND([Sucursal_ID] IN LIST([_THISROW].[Sucursal_Origen_ID], [_THISROW].[Sucursal_Destino_ID]), [Rol_Sucursal] = \"Encargado\", [Activo?] = TRUE))"
+    },
+    "Subject": "⏰ TRANSFERENCIA ESTANCADA +24h - {{[_THISROW].[Orden_ID]}}",
+    "Body": "La transferencia **{{[_THISROW].[Orden_ID]}}** lleva **más de 24 horas** sin cambio de estado:\n\n• **Estado actual:** {{[_THISROW].[Estado]}}\n• **Última actualización:** {{[_THISROW].[Updated_At]}} (hace {{HOUR(NOW() - [_THISROW].[Updated_At])}}h)\n• **Origen:** {{[_THISROW].[Sucursal_Origen_ID].[Nombre]}}\n• **Destino:** {{[_THISROW].[Sucursal_Destino_ID].[Nombre]}}\n\n⚡ **Acción requerida** para evitar bloqueo de stock.",
+    "DeepLink": "appsheet://erp_gastronomico_pruebas/Ordenes_Transferencia/{{[_THISROW].[Orden_ID]}}"
+  },
+  {
+    "TaskName": "Task_Alerta_Diferencia_Critica_Transferencia_Admin",
+    "Type": "Push Notification",
+    "Description": "Alerta a Admin si diferencia en recepción supera umbral crítico",
+    "TableName": "Recepciones_Transferencia",
+    "Recipients": {
+      "Type": "Expression",
+      "Expression": "SELECT(Usuarios[Email], AND([Rol_Principal] = \"Administrador\", [Activo?] = TRUE))"
+    },
+    "Subject": "🚨 DIFERENCIA CRÍTICA TRANSFERENCIA - {{[_THISROW].[Orden_ID].[Orden_ID]}} ({{[_THISROW].[Diferencia]}} {{[_THISROW].[Unidad_Medida]}})",
+    "Body": "Recepción con diferencia **SUPERIOR AL UMBRAL CRÍTICO**:\n\n• **Transferencia:** {{[_THISROW].[Orden_ID].[Orden_ID]}}\n• **Ingrediente:** {{[_THISROW].[Ingrediente_ID].[Nombre]}}\n• **Esperado:** {{[_THISROW].[Cantidad_Esperada]}} {{[_THISROW].[Unidad_Medida]}}\n• **Recibido:** {{[_THISROW].[Cantidad_Recibida]}} {{[_THISROW].[Unidad_Medida]}}\n• **Diferencia:** {{[_THISROW].[Diferencia]}} {{[_THISROW].[Unidad_Medida]}} ({{ROUND(([_THISROW].[Diferencia]/[_THISROW].[Cantidad_Esperada])*100, 1)}}%)\n• **Umbral crítico:** {{LOOKUP(\"UMBRAL_DIFERENCIA_TRANSFERENCIA_CRITICA\", \"Config_Global\", \"Clave\", \"Valor\")}}%\n• **Origen:** {{[_THISROW].[Orden_ID].[Sucursal_Origen_ID].[Nombre]}}\n• **Destino:** {{[_THISROW].[Orden_ID].[Sucursal_Destino_ID].[Nombre]}}\n• **Recibido por:** {{[_THISROW].[Recibida_Por]}}\n\n⚡ **Investigar inmediatamente** - posible pérdida, error de conteo o robo.",
+    "DeepLink": "appsheet://erp_gastronomico_pruebas/Recepciones_Transferencia/{{[_THISROW].[Recepcion_ID]}}"
+  }
+]

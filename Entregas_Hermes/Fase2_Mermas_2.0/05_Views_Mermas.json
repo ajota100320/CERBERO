@@ -1,0 +1,214 @@
+[
+  {
+    "ViewName": "View_Mermas_Operador_Mis_Reportes",
+    "TableName": "Registro_de_Mermas_y_Vencimientos",
+    "Type": "Deck",
+    "Position": 1,
+    "ShowIf": "USERROLE(\"Operador\")",
+    "Columns": [
+      "Fecha_Hora_Evento",
+      "Ingrediente_ID",
+      "Tipo_Merma",
+      "Cantidad",
+      "Unidad_Medida",
+      "Costo_Total_Estimado",
+      "Estado_Merma",
+      "Evidencia_Foto"
+    ],
+    "RowFilter": "[Reportado_Por] = USEREMAIL()",
+    "OrderBy": "Fecha_Hora_Evento DESC",
+    "GroupBy": "Estado_Merma",
+    "Options": {
+      "ShowSearch": true,
+      "ShowSelect": false,
+      "AllowInlineEdit": false
+    }
+  },
+  {
+    "ViewName": "View_Mermas_Operador_Nueva_Merma",
+    "TableName": "Registro_de_Mermas_y_Vencimientos",
+    "Type": "Form",
+    "Position": 2,
+    "ShowIf": "USERROLE(\"Operador\")",
+    "Columns": [
+      "Ingrediente_ID",
+      "Tipo_Merma",
+      "Cantidad",
+      "Unidad_Medida",
+      "Motivo",
+      "Evidencia_Foto",
+      "Ubicacion_Especifica",
+      "Turno",
+      "Fecha_Hora_Evento"
+    ],
+    "InitialValues": {
+      "Estado_Merma": "\"Borrador\"",
+      "Reportado_Por": "USEREMAIL()",
+      "Sucursal_ID": "LOOKUP(USEREMAIL(), \"Usuarios_Sucursales\", \"Email\", \"Sucursal_ID\")",
+      "Fecha_Hora_Evento": "NOW()",
+      "Sync_Pending?": "TRUE"
+    },
+    "Options": {
+      "ShowCancelButton": true,
+      "ShowSaveButton": true
+    }
+  },
+  {
+    "ViewName": "View_Mermas_Encargado_Pendientes_Revision",
+    "TableName": "Registro_de_Mermas_y_Vencimientos",
+    "Type": "Table",
+    "Position": 1,
+    "ShowIf": "USERROLE(\"Encargado\")",
+    "Columns": [
+      "Fecha_Hora_Evento",
+      "Ingrediente_ID",
+      "Tipo_Merma",
+      "Cantidad",
+      "Unidad_Medida",
+      "Costo_Total_Estimado",
+      "Reportado_Por",
+      "Turno",
+      "Evidencia_Foto",
+      "Estado_Merma"
+    ],
+    "RowFilter": "AND([Estado_Merma] = \"Pendiente\", [Sucursal_ID] = LOOKUP(USEREMAIL(), \"Usuarios_Sucursales\", \"Email\", \"Sucursal_ID\"))",
+    "OrderBy": "Enviado_A_Revision_En ASC",
+    "Options": {
+      "ShowSearch": true,
+      "ShowSelect": true,
+      "AllowInlineEdit": false
+    },
+    "Actions": [
+      "Merma_Aprobar",
+      "Merma_Rechazar",
+      "Merma_Solicitar_Correccion"
+    ]
+  },
+  {
+    "ViewName": "View_Mermas_Encargado_Todas_Su_Sucursal",
+    "TableName": "Registro_de_Mermas_y_Vencimientos",
+    "Type": "Deck",
+    "Position": 2,
+    "ShowIf": "USERROLE(\"Encargado\")",
+    "Columns": [
+      "Fecha_Hora_Evento",
+      "Ingrediente_ID",
+      "Tipo_Merma",
+      "Cantidad",
+      "Unidad_Medida",
+      "Costo_Total_Estimado",
+      "Reportado_Por",
+      "Estado_Merma",
+      "Aprobado_Por",
+      "Fecha_Aprobacion",
+      "Rechazado_Por",
+      "Fecha_Rechazo",
+      "Motivo_Rechazo"
+    ],
+    "RowFilter": "[Sucursal_ID] = LOOKUP(USEREMAIL(), \"Usuarios_Sucursales\", \"Email\", \"Sucursal_ID\")",
+    "OrderBy": "Fecha_Hora_Evento DESC",
+    "GroupBy": "Estado_Merma",
+    "Options": {
+      "ShowSearch": true,
+      "ShowSelect": false,
+      "AllowInlineEdit": false
+    }
+  },
+  {
+    "ViewName": "View_Mermas_Admin_Todas_Sucursales",
+    "TableName": "Registro_de_Mermas_y_Vencimientos",
+    "Type": "Table",
+    "Position": 1,
+    "ShowIf": "USERROLE(\"Administrador\")",
+    "Columns": [
+      "Fecha_Hora_Evento",
+      "Sucursal_ID",
+      "Ingrediente_ID",
+      "Tipo_Merma",
+      "Cantidad",
+      "Unidad_Medida",
+      "Costo_Total_Estimado",
+      "Reportado_Por",
+      "Estado_Merma",
+      "Aprobado_Por",
+      "Fecha_Aprobacion",
+      "Rechazado_Por",
+      "Fecha_Rechazo",
+      "Motivo_Rechazo",
+      "Anulada_Por",
+      "Fecha_Anulacion",
+      "Motivo_Anulacion"
+    ],
+    "OrderBy": "Fecha_Hora_Evento DESC",
+    "GroupBy": "Sucursal_ID",
+    "Options": {
+      "ShowSearch": true,
+      "ShowSelect": true,
+      "AllowInlineEdit": false
+    },
+    "Actions": [
+      "Merma_Aprobar",
+      "Merma_Rechazar",
+      "Merma_Solicitar_Correccion",
+      "Merma_Anular"
+    ]
+  },
+  {
+    "ViewName": "View_Mermas_Dashboard_KPIs_Encargado",
+    "TableName": "Registro_de_Mermas_y_Vencimientos",
+    "Type": "Dashboard",
+    "Position": 3,
+    "ShowIf": "USERROLE(\"Encargado\")",
+    "Columns": [
+      "Estado_Merma",
+      "Costo_Total_Estimado",
+      "Tipo_Merma"
+    ],
+    "RowFilter": "[Sucursal_ID] = LOOKUP(USEREMAIL(), \"Usuarios_Sucursales\", \"Email\", \"Sucursal_ID\")",
+    "Options": {
+      "Charts": [
+        {
+          "Name": "Mermas por Estado (Hoy)",
+          "Type": "Pie",
+          "Dimension": "Estado_Merma",
+          "Measure": "COUNT(*)",
+          "Filter": "DATE([Fecha_Hora_Evento]) = TODAY()"
+        },
+        {
+          "Name": "Costo Mermas por Tipo (Semana)",
+          "Type": "Bar",
+          "Dimension": "Tipo_Merma",
+          "Measure": "SUM([Costo_Total_Estimado])",
+          "Filter": "[Fecha_Hora_Evento] >= TODAY() - 7"
+        },
+        {
+          "Name": "Tendencia Costo Mermas (30 días)",
+          "Type": "Line",
+          "Dimension": "DATE([Fecha_Hora_Evento])",
+          "Measure": "SUM([Costo_Total_Estimado])",
+          "Filter": "[Fecha_Hora_Evento] >= TODAY() - 30"
+        }
+      ],
+      "KPIs": [
+        {
+          "Name": "Mermas Pendientes",
+          "Expression": "COUNT(FILTER(\"Registro_de_Mermas_y_Vencimientos\", AND([Estado_Merma] = \"Pendiente\", [Sucursal_ID] = LOOKUP(USEREMAIL(), \"Usuarios_Sucursales\", \"Email\", \"Sucursal_ID\"))))",
+          "Icon": "alert-circle",
+          "Color": "Warning"
+        },
+        {
+          "Name": "Costo Mermas Aprobadas Hoy",
+          "Expression": "SUM(FILTER(\"Registro_de_Mermas_y_Vencimientos\", AND([Estado_Merma] = \"Aprobada\", DATE([Fecha_Aprobacion]) = TODAY(), [Sucursal_ID] = LOOKUP(USEREMAIL(), \"Usuarios_Sucursales\", \"Email\", \"Sucursal_ID\")))[Costo_Total_Estimado])",
+          "Icon": "currency-dollar",
+          "Color": "Danger"
+        },
+        {
+          "Name": "Top Ingrediente con Mermas (Semana)",
+          "Expression": "TOP(FILTER(\"Registro_de_Mermas_y_Vencimientos\", AND([Fecha_Hora_Evento] >= TODAY() - 7, [Sucursal_ID] = LOOKUP(USEREMAIL(), \"Usuarios_Sucursales\", \"Email\", \"Sucursal_ID\"))), 1, \"Ingrediente_ID\", \"Costo_Total_Estimado\")[Ingrediente_ID]",
+          "Icon": "trending-up",
+          "Color": "Info"
+        }
+      ]
+    }
+  }
+]

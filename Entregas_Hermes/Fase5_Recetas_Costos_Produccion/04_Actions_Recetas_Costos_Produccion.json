@@ -1,0 +1,332 @@
+[
+  {
+    "ActionName": "Receta_Crear_Borrador",
+    "Type": "App: go to a view within this app",
+    "Description": "Abre formulario para crear nueva receta (Encargado/Admin)",
+    "TableName": "Recetas",
+    "Icon": "add-circle",
+    "ShowIf": "OR(USERROLE(\"Administrador\"), USERROLE(\"Encargado\"))",
+    "TargetView": "View_Receta_Formulario_Nueva"
+  },
+  {
+    "ActionName": "Receta_Enviar_Revision",
+    "Type": "Data: set column values",
+    "Description": "Encargado envía receta a revisión (Borrador → En_Revision)",
+    "TableName": "Recetas",
+    "ShowIf": "AND([Estado] = \"Borrador\", OR(USERROLE(\"Administrador\"), AND(USERROLE(\"Encargado\"), [Sucursal_ID] = LOOKUP(USEREMAIL(), \"Usuarios_Sucursales\", \"Email\", \"Sucursal_ID\"))))",
+    "Columns": [
+      "Estado",
+      "Sync_Pending?"
+    ],
+    "Values": [
+      "\"En_Revision\"",
+      "TRUE"
+    ]
+  },
+  {
+    "ActionName": "Receta_Aprobar",
+    "Type": "Data: set column values",
+    "Description": "Admin aprueba receta → Estado = Aprobada, calcula costos finales",
+    "TableName": "Recetas",
+    "ShowIf": "AND([Estado] = \"En_Revision\", USERROLE(\"Administrador\"))",
+    "Columns": [
+      "Estado",
+      "Aprobada_Por",
+      "Fecha_Aprobacion",
+      "Version",
+      "Costo_Total_Receta",
+      "Costo_Por_Porciona",
+      "Sync_Pending?"
+    ],
+    "Values": [
+      "\"Aprobada\"",
+      "USEREMAIL()",
+      "NOW()",
+      "[Version] + 1",
+      "SUM(FILTER(\"Receta_Ingredientes\", [Receta_ID] = [_THISROW].[Receta_ID])[Costo_Total_Linea])",
+      "SUM(FILTER(\"Receta_Ingredientes\", [Receta_ID] = [_THISROW].[Receta_ID])[Costo_Total_Linea]) / [Rendimiento_Porciones]",
+      "TRUE"
+    ]
+  },
+  {
+    "ActionName": "Receta_Rechazar",
+    "Type": "Data: set column values",
+    "Description": "Admin rechaza receta → vuelve a Borrador con comentarios",
+    "TableName": "Recetas",
+    "ShowIf": "AND([Estado] = \"En_Revision\", USERROLE(\"Administrador\"))",
+    "Columns": [
+      "Estado",
+      "Sync_Pending?"
+    ],
+    "Values": [
+      "\"Borrador\"",
+      "TRUE"
+    ],
+    "InputParameters": [
+      {
+        "Name": "Comentario_Rechazo",
+        "Type": "LongText",
+        "Required": true,
+        "Prompt": "Comentarios para el Encargado (mín 10 caracteres)",
+        "MinLength": 10
+      }
+    ],
+    "SetValuesWithInputs": [
+      {
+        "Column": "Observaciones",
+        "Value": "CONCATENATE(IF(ISBLANK([Observaciones]), \"\", [Observaciones] & \" | \"), \"Rechazado por Admin: \", [Comentario_Rechazo], \" - \", NOW())"
+      }
+    ]
+  },
+  {
+    "ActionName": "Receta_Clonar_Nueva_Version",
+    "Type": "Data: add a new row to a table",
+    "Description": "Crea nueva versión de receta aprobada (incrementa versión, estado Borrador)",
+    "TableName": "Recetas",
+    "ShowIf": "AND([Estado] = \"Aprobada\", OR(USERROLE(\"Administrador\"), AND(USERROLE(\"Encargado\"), [Sucursal_ID] = LOOKUP(USEREMAIL(), \"Usuarios_Sucursales\", \"Email\", \"Sucursal_ID\"))))",
+    "InitialValues": {
+      "Nombre": "[_THISROW].[Nombre]",
+      "Categoria": "[_THISROW].[Categoria]",
+      "Descripcion": "[_THISROW].[Descripcion]",
+      "Rendimiento_Porciones": "[_THISROW].[Rendimiento_Porciones]",
+      "Unidad_Rendimiento": "[_THISROW].[Unidad_Rendimiento]",
+      "Tiempo_Preparacion_Min": "[_THISROW].[Tiempo_Preparacion_Min]",
+      "Tiempo_Coccion_Min": "[_THISROW].[Tiempo_Coccion_Min]",
+      "Dificultad": "[_THISROW].[Dificultad]",
+      "Version": "[_THISROW].[Version] + 1",
+      "Estado": "\"Borrador\"",
+      "Sucursal_ID": "[_THISROW].[Sucursal_ID]",
+      "Es_Activa": "FALSE",
+      "Sync_Pending?": "TRUE"
+    },
+    "ReferencedAction": "Action_Clonar_Ingredientes_Receta"
+  },
+  {
+    "ActionName": "Action_Clonar_Ingredientes_Receta",
+    "Type": "Data: add a new row to a table",
+    "Description": "Copia todos los ingredientes de la receta original a la nueva versión",
+    "TableName": "Receta_Ingredientes",
+    "RowSelection": {
+      "Type": "Expression",
+      "Expression": "FILTER(\"Receta_Ingredientes\", [Receta_ID] = [_THISROW_BEFORE].[Receta_ID])"
+    },
+    "InitialValues": {
+      "Receta_ID": "[_THISROW].[Receta_ID]",
+      "Ingrediente_ID": "[_THISROW].[Ingrediente_ID]",
+      "Cantidad": "[_THISROW].[Cantidad]",
+      "Unidad_Medida": "[_THISROW].[Unidad_Medida]",
+      "Merma_Porcentaje": "[_THISROW].[Merma_Porcentaje]",
+      "Costo_Unitario_Snapshot": "LOOKUP([_THISROW].[Ingrediente_ID], \"Ingredientes_y_Stock\", \"Ingrediente_ID\", \"Costo_Actual\")",
+      "Es_Opcional": "[_THISROW].[Es_Opcional]",
+      "Orden": "[_THISROW].[Orden]",
+      "Sync_Pending?": "TRUE"
+    }
+  },
+  {
+    "ActionName": "Receta_Agregar_Ingrediente",
+    "Type": "Data: add a new row to a table",
+    "Description": "Agrega ingrediente a receta en Borrador/En_Revision",
+    "TableName": "Receta_Ingredientes",
+    "ShowIf": "AND(IN([Receta_ID].[Estado], LIST(\"Borrador\", \"En_Revision\")), OR(USERROLE(\"Administrador\"), AND(USERROLE(\"Encargado\"), [Receta_ID].[Sucursal_ID] = LOOKUP(USEREMAIL(), \"Usuarios_Sucursales\", \"Email\", \"Sucursal_ID\"))))",
+    "InitialValues": {
+      "Receta_ID": "[_THISROW].[Receta_ID]",
+      "Ingrediente_ID": "",
+      "Cantidad": 1,
+      "Merma_Porcentaje": 0,
+      "Es_Opcional": "FALSE",
+      "Orden": "COUNT(FILTER(\"Receta_Ingredientes\", [Receta_ID] = [_THISROW].[Receta_ID])) + 1",
+      "Sync_Pending?": "TRUE"
+    }
+  },
+  {
+    "ActionName": "Produccion_Iniciar",
+    "Type": "App: go to a view within this app",
+    "Description": "Abre formulario para iniciar producción (Operador/Encargado)",
+    "TableName": "Recetas",
+    "Icon": "play-arrow",
+    "ShowIf": "AND([Estado] = \"Aprobada\", [Es_Activa?] = TRUE, OR(USERROLE(\"Administrador\"), USERROLE(\"Encargado\"), USERROLE(\"Operador\")))",
+    "TargetView": "View_Produccion_Formulario_Nueva"
+  },
+  {
+    "ActionName": "Produccion_Registrar",
+    "Type": "Data: add a new row to a table",
+    "Description": "Crea registro de producción + líneas de detalle desde receta",
+    "TableName": "Produccion",
+    "ShowIf": "OR(USERROLE(\"Administrador\"), USERROLE(\"Encargado\"), USERROLE(\"Operador\"))",
+    "InitialValues": {
+      "Receta_ID": "[_THISROW].[Receta_ID]",
+      "Sucursal_ID": "LOOKUP(USEREMAIL(), \"Usuarios_Sucursales\", \"Email\", \"Sucursal_ID\")",
+      "Producida_Por": "USEREMAIL()",
+      "Fecha_Produccion": "NOW()",
+      "Cantidad_Producida": 1,
+      "Unidad_Produccion": "[_THISROW].[Unidad_Rendimiento]",
+      "Estado": "\"En_Proceso\"",
+      "Costo_Teorico_Total": "[_THISROW].[Costo_Por_Porciona]",
+      "Sync_Pending?": "TRUE"
+    },
+    "ReferencedAction": "Action_Crear_Detalle_Produccion_Desde_Receta"
+  },
+  {
+    "ActionName": "Action_Crear_Detalle_Produccion_Desde_Receta",
+    "Type": "Data: add a new row to a table",
+    "Description": "Crea líneas en Produccion_Detalle para cada ingrediente de la receta",
+    "TableName": "Produccion_Detalle",
+    "RowSelection": {
+      "Type": "Expression",
+      "Expression": "FILTER(\"Receta_Ingredientes\", [Receta_ID] = [_THISROW].[Receta_ID])"
+    },
+    "InitialValues": {
+      "Produccion_ID": "[_THISROW].[Produccion_ID]",
+      "Receta_Ing_ID": "[_THISROW].[Receta_Ing_ID]",
+      "Ingrediente_ID": "[_THISROW].[Ingrediente_ID]",
+      "Cantidad_Teorica": "[_THISROW].[Cantidad] * ([_THISROW].[Produccion].[Cantidad_Producida] / LOOKUP([_THISROW].[Produccion_ID], \"Produccion\", \"Produccion_ID\", \"Cantidad_Producida\"))",
+      "Unidad_Medida": "[_THISROW].[Unidad_Medida]",
+      "Costo_Teorico_Linea": "[_THISROW].[Costo_Total_Linea] * ([_THISROW].[Produccion].[Cantidad_Producida] / LOOKUP([_THISROW].[Produccion_ID], \"Produccion\", \"Produccion_ID\", \"Cantidad_Producida\"))",
+      "Sync_Pending?": "TRUE"
+    }
+  },
+  {
+    "ActionName": "Produccion_Registrar_Consumo_Real",
+    "Type": "Data: set column values",
+    "Description": "Operador ingresa cantidad real consumida por ingrediente",
+    "TableName": "Produccion_Detalle",
+    "ShowIf": "AND([Produccion_ID].[Estado] = \"En_Proceso\", OR(USERROLE(\"Operador\"), USERROLE(\"Encargado\"), USERROLE(\"Administrador\")))",
+    "Columns": [
+      "Cantidad_Real",
+      "Observacion",
+      "Sync_Pending?"
+    ],
+    "Values": [
+      "",
+      "",
+      "TRUE"
+    ]
+  },
+  {
+    "ActionName": "Produccion_Completar",
+    "Type": "Data: execute an action on a set of rows",
+    "Description": "Finaliza producción → descuenta stock real + genera Costos_Historicos si hay variación",
+    "TableName": "Produccion",
+    "ShowIf": "AND([Estado] = \"En_Proceso\", OR(USERROLE(\"Administrador\"), AND(USERROLE(\"Encargado\"), [Sucursal_ID] = LOOKUP(USEREMAIL(), \"Usuarios_Sucursales\", \"Email\", \"Sucursal_ID\"))))",
+    "ReferencedAction": "Action_Finalizar_Produccion",
+    "RunAsJob": true
+  },
+  {
+    "ActionName": "Action_Finalizar_Produccion",
+    "Type": "Data: execute an action on a set of rows",
+    "Description": "Para cada ingrediente: descuenta stock real, actualiza costo real, genera histórico si variación > umbral",
+    "TableName": "Produccion_Detalle",
+    "RowSelection": {
+      "Type": "Expression",
+      "Expression": "FILTER(\"Produccion_Detalle\", [Produccion_ID] = [_THISROW].[Produccion_ID])"
+    },
+    "ReferencedAction": "Action_Aplicar_Consumo_Real_Stock",
+    "RunAsJob": true
+  },
+  {
+    "ActionName": "Action_Aplicar_Consumo_Real_Stock",
+    "Type": "Data: execute an action on a set of rows",
+    "Description": "Actualiza Ingredientes_y_Stock y Costos_Historicos",
+    "TableName": "Ingredientes_y_Stock",
+    "RowSelection": {
+      "Type": "Expression",
+      "Expression": "FILTER(\"Ingredientes_y_Stock\", AND([Ingrediente_ID] = [_THISROW].[Ingrediente_ID], [Sucursal_ID] = [_THISROW].[Produccion_ID].[Sucursal_ID]))"
+    },
+    "ReferencedAction": "Action_Descontar_Stock_Produccion",
+    "RunAsJob": true
+  },
+  {
+    "ActionName": "Action_Descontar_Stock_Produccion",
+    "Type": "Data: set column values",
+    "Description": "Stock_Actual = Stock_Actual - Cantidad_Real",
+    "TableName": "Ingredientes_y_Stock",
+    "Columns": [
+      "Stock_Actual",
+      "Updated_At",
+      "Updated_By",
+      "Sync_Pending?"
+    ],
+    "Values": [
+      "[_THISROW].[Stock_Actual] - LOOKUP([_THISROW].[Ingrediente_ID], \"Produccion_Detalle\", \"Ingrediente_ID\", \"Cantidad_Real\")",
+      "NOW()",
+      "USEREMAIL()",
+      "TRUE"
+    ]
+  },
+  {
+    "ActionName": "Produccion_Cancelar",
+    "Type": "Data: set column values",
+    "Description": "Cancela producción en proceso (no descuenta stock)",
+    "TableName": "Produccion",
+    "ShowIf": "AND([Estado] = \"En_Proceso\", OR(USERROLE(\"Administrador\"), USERROLE(\"Encargado\")))",
+    "Columns": [
+      "Estado",
+      "Sync_Pending?"
+    ],
+    "Values": [
+      "\"Cancelada\"",
+      "TRUE"
+    ]
+  },
+  {
+    "ActionName": "Costo_Actualizar_Ingrediente",
+    "Type": "Data: set column values",
+    "Description": "Admin actualiza costo de ingrediente → genera histórico + recalcula recetas afectadas",
+    "TableName": "Ingredientes_y_Stock",
+    "ShowIf": "USERROLE(\"Administrador\")",
+    "Columns": [
+      "Costo_Actual",
+      "Updated_At",
+      "Updated_By",
+      "Sync_Pending?"
+    ],
+    "Values": [
+      "",
+      "NOW()",
+      "USEREMAIL()",
+      "TRUE"
+    ],
+    "InputParameters": [
+      {
+        "Name": "Nuevo_Costo",
+        "Type": "Price",
+        "Required": true,
+        "Prompt": "Nuevo costo unitario"
+      },
+      {
+        "Name": "Fuente_Cambio",
+        "Type": "Enum",
+        "Required": true,
+        "Prompt": "Fuente del cambio",
+        "Values": ["Manual", "Actualizacion_Proveedor", "Ajuste_Inventario"]
+      }
+    ],
+    "SetValuesWithInputs": [
+      {
+        "Column": "Costo_Actual",
+        "Value": "[Nuevo_Costo]"
+      }
+    ],
+    "ReferencedAction": "Action_Generar_Historico_Costo_Ingrediente"
+  },
+  {
+    "ActionName": "Action_Generar_Historico_Costo_Ingrediente",
+    "Type": "Data: add a new row to a table",
+    "Description": "Crea registro en Costos_Historicos para ingrediente",
+    "TableName": "Costos_Historicos",
+    "InitialValues": {
+      "Entidad_Tipo": "\"Ingrediente\"",
+      "Entidad_ID": "[_THISROW].[Ingrediente_ID]",
+      "Sucursal_ID": "[_THISROW].[Sucursal_ID]",
+      "Costo_Anterior": "[_THISROW_BEFORE].[Costo_Actual]",
+      "Costo_Nuevo": "[_THISROW].[Costo_Actual]",
+      "Fuente_Cambio": "[Fuente_Cambio]",
+      "Cambiado_Por": "USEREMAIL()",
+      "Fecha_Cambio": "NOW()",
+      "Aprobado_Por": "USEREMAIL()",
+      "Fecha_Aprobacion": "NOW()",
+      "Activo?": "TRUE",
+      "Sync_Pending?": "TRUE"
+    }
+  }
+]

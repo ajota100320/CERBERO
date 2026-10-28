@@ -1,0 +1,695 @@
+[
+  {
+    "ViewName": "View_Tareas_Admin_Todas",
+    "TableName": "Tareas",
+    "Type": "Table",
+    "Position": 1,
+    "ShowIf": "USERROLE(\"Administrador\")",
+    "Columns": [
+      "Nombre",
+      "Categoria",
+      "Sucursal_ID",
+      "Es_Recurrente",
+      "Duracion_Estimada_Min",
+      "Es_Obligatoria",
+      "Es_Activa?"
+    ],
+    "OrderBy": "Sucursal_ID, Categoria, Nombre",
+    "GroupBy": "Categoria",
+    "Options": {
+      "ShowSearch": true,
+      "ShowSelect": false,
+      "AllowInlineEdit": true
+    },
+    "Actions": [
+      "Tarea_Crear_Nueva",
+      "Tarea_Programar",
+      "Tarea_Clonar"
+    ]
+  },
+  {
+    "ViewName": "View_Tareas_Encargado_Mi_Sucursal",
+    "TableName": "Tareas",
+    "Type": "Deck",
+    "Position": 2,
+    "ShowIf": "OR(USERROLE(\"Encargado\"), USERROLE(\"Operador\"))",
+    "Columns": [
+      "Nombre",
+      "Categoria",
+      "Duracion_Estimada_Min",
+      "Es_Obligatoria"
+    ],
+    "RowFilter": "AND([Es_Activa?] = TRUE, IN([Sucursal_ID], SELECT(Usuarios_Sucursales[Sucursal_ID], [Email] = USEREMAIL())))",
+    "OrderBy": "Categoria, Nombre",
+    "Options": {
+      "ShowSearch": true,
+      "ShowSelect": false,
+      "AllowInlineEdit": false
+    },
+    "Actions": [
+      "Tarea_Crear_Nueva",
+      "Tarea_Ver_Programaciones",
+      "Tarea_Ver_Ejecuciones"
+    ]
+  },
+  {
+    "ViewName": "View_Tarea_Formulario_Nueva",
+    "TableName": "Tareas",
+    "Type": "Form",
+    "Position": 3,
+    "ShowIf": "OR(USERROLE(\"Administrador\"), USERROLE(\"Encargado\"))",
+    "Columns": [
+      "Nombre",
+      "Categoria",
+      "Descripcion",
+      "Es_Recurrente",
+      "Duracion_Estimada_Min",
+      "Es_Obligatoria",
+      "Checklist_JSON"
+    ],
+    "InitialValues": {
+      "Es_Activa?": "TRUE",
+      "Sucursal_ID": "LOOKUP(USEREMAIL(), \"Usuarios_Sucursales\", \"Email\", \"Sucursal_ID\")",
+      "Creado_Por": "USEREMAIL()",
+      "Fecha_Creacion": "NOW()",
+      "Sync_Pending?": "TRUE"
+    },
+    "Options": {
+      "ShowCancelButton": true,
+      "ShowSaveButton": true
+    }
+  },
+  {
+    "ViewName": "View_Tarea_Programaciones_Admin",
+    "TableName": "Tarea_Programaciones",
+    "Type": "Table",
+    "Position": 4,
+    "ShowIf": "USERROLE(\"Administrador\")",
+    "Columns": [
+      "Tarea_ID",
+      "Sucursal_ID",
+      "Frecuencia",
+      "Dias_Semana",
+      "Hora_Programada",
+      "Hora_Ventana_Fin",
+      "Responsable_Rol",
+      "Responsable_Usuario_Especifico",
+      "Es_Activa"
+    ],
+    "OrderBy": "Sucursal_ID, [Tarea_ID].[Categoria], Hora_Programada",
+    "GroupBy": "Frecuencia",
+    "Options": {
+      "ShowSearch": true,
+      "ShowSelect": false,
+      "AllowInlineEdit": true
+    }
+  },
+  {
+    "ViewName": "View_Tarea_Programaciones_Encargado",
+    "TableName": "Tarea_Programaciones",
+    "Type": "Table",
+    "Position": 5,
+    "ShowIf": "USERROLE(\"Encargado\")",
+    "Columns": [
+      "Tarea_ID",
+      "Frecuencia",
+      "Dias_Semana",
+      "Hora_Programada",
+      "Hora_Ventana_Fin",
+      "Responsable_Rol",
+      "Es_Activa"
+    ],
+    "RowFilter": "IN([Sucursal_ID], SELECT(Usuarios_Sucursales[Sucursal_ID], [Email] = USEREMAIL()))",
+    "OrderBy": "Hora_Programada",
+    "Options": {
+      "ShowSearch": true,
+      "ShowSelect": false,
+      "AllowInlineEdit": true
+    }
+  },
+  {
+    "ViewName": "View_Tareas_Hoy_Operador",
+    "TableName": "Tarea_Ejecuciones",
+    "Type": "Deck",
+    "Position": 6,
+    "ShowIf": "OR(USERROLE(\"Operador\"), USERROLE(\"Encargado\"))",
+    "Columns": [
+      "Tarea_ID",
+      "Prog_ID",
+      "Estado",
+      "Fecha_Ejecucion",
+      "Hora_Inicio",
+      "Hora_Fin",
+      "Duracion_Real_Min"
+    ],
+    "RowFilter": "AND([Fecha_Ejecucion] = TODAY(), IN([Sucursal_ID], SELECT(Usuarios_Sucursales[Sucursal_ID], [Email] = USEREMAIL())))",
+    "OrderBy": "[Prog_ID].[Hora_Programada]",
+    "GroupBy": "Estado",
+    "Options": {
+      "ShowSearch": true,
+      "ShowSelect": false,
+      "AllowInlineEdit": false
+    },
+    "Actions": [
+      "Tarea_Ejecutar_Iniciar",
+      "Tarea_Ejecutar_Completar",
+      "Tarea_Ejecutar_Omitir"
+    ]
+  },
+  {
+    "ViewName": "View_Tarea_Ejecucion_Formulario",
+    "TableName": "Tarea_Ejecuciones",
+    "Type": "Form",
+    "Position": 7,
+    "ShowIf": "OR(USERROLE(\"Operador\"), USERROLE(\"Encargado\"))",
+    "Columns": [
+      "Checklist_Respuestas_JSON",
+      "Evidencia_Fotos",
+      "Observaciones"
+    ],
+    "InitialValues": {
+      "Ejecutada_Por": "USEREMAIL()",
+      "Fecha_Ejecucion": "TODAY()",
+      "Hora_Inicio": "NOW()",
+      "Estado": "\"En_Proceso\"",
+      "Sync_Pending?": "TRUE"
+    },
+    "Options": {
+      "ShowCancelButton": true,
+      "ShowSaveButton": true
+    }
+  },
+  {
+    "ViewName": "View_Tarea_Ejecucion_Completar",
+    "TableName": "Tarea_Ejecuciones",
+    "Type": "Form",
+    "Position": 8,
+    "ShowIf": "OR(USERROLE(\"Operador\"), USERROLE(\"Encargado\"))",
+    "Columns": [
+      "Hora_Fin",
+      "Checklist_Respuestas_JSON",
+      "Evidencia_Fotos",
+      "Observaciones"
+    ],
+    "InitialValues": {
+      "Hora_Fin": "NOW()",
+      "Estado": "\"Completada\"",
+      "Duracion_Real_Min": "[Hora_Fin] - [Hora_Inicio]",
+      "Sync_Pending?": "TRUE"
+    },
+    "Options": {
+      "ShowCancelButton": true,
+      "ShowSaveButton": true
+    }
+  },
+  {
+    "ViewName": "View_Tareas_Historico_Encargado",
+    "TableName": "Tarea_Ejecuciones",
+    "Type": "Table",
+    "Position": 9,
+    "ShowIf": "USERROLE(\"Encargado\")",
+    "Columns": [
+      "Tarea_ID",
+      "Fecha_Ejecucion",
+      "Ejecutada_Por",
+      "Estado",
+      "Duracion_Real_Min",
+      "Incidencia_Generada?",
+      "Incidencia_ID"
+    ],
+    "RowFilter": "IN([Sucursal_ID], SELECT(Usuarios_Sucursales[Sucursal_ID], [Email] = USEREMAIL()))",
+    "OrderBy": "Fecha_Ejecucion DESC",
+    "GroupBy": "Estado",
+    "Options": {
+      "ShowSearch": true,
+      "ShowSelect": false,
+      "AllowInlineEdit": false
+    }
+  },
+  {
+    "ViewName": "View_KPIs_Admin_Dashboard",
+    "TableName": "KPI_Definiciones",
+    "Type": "Dashboard",
+    "Position": 10,
+    "ShowIf": "USERROLE(\"Administrador\")",
+    "Columns": [
+      "Nombre",
+      "Categoria",
+      "Sucursal_ID",
+      "Frecuencia_Calculo",
+      "Es_Activa"
+    ],
+    "Options": {
+      "Charts": [
+        {
+          "Name": "KPIs por Categoría",
+          "Type": "Pie",
+          "Dimension": "Categoria",
+          "Measure": "COUNT(*)"
+        },
+        {
+          "Name": "Estado KPIs (Último cálculo)",
+          "Type": "Bar",
+          "Dimension": "[Registros_KPI].[Estado_KPI]",
+          "Measure": "COUNT(*)",
+          "Filter": "[Registros_KPI].[Fecha_Calculo] >= TODAY() - 1"
+        }
+      ],
+      "KPIs": [
+        {
+          "Name": "KPIs Activos Totales",
+          "Expression": "COUNT(FILTER(\"KPI_Definiciones\", [Es_Activa] = TRUE))",
+          "Icon": "bar-chart-2",
+          "Color": "Info"
+        },
+        {
+          "Name": "KPIs en Rojo (Críticos)",
+          "Expression": "COUNT(FILTER(\"Registros_KPI\", AND([Fecha_Calculo] >= TODAY() - 1, [Estado_KPI] = \"Rojo\")))",
+          "Icon": "alert-triangle",
+          "Color": "Danger"
+        },
+        {
+          "Name": "KPIs en Amarillo (Atención)",
+          "Expression": "COUNT(FILTER(\"Registros_KPI\", AND([Fecha_Calculo] >= TODAY() - 1, [Estado_KPI] = \"Amarillo\")))",
+          "Icon": "alert-circle",
+          "Color": "Warning"
+        }
+      ]
+    }
+  },
+  {
+    "ViewName": "View_KPIs_Encargado_Mi_Sucursal",
+    "TableName": "Registros_KPI",
+    "Type": "Deck",
+    "Position": 11,
+    "ShowIf": "USERROLE(\"Encargado\")",
+    "Columns": [
+      "KPI_ID",
+      "Valor",
+      "Estado_KPI",
+      "Tendencia",
+      "Fecha_Calculo"
+    ],
+    "RowFilter": "IN([Sucursal_ID], SELECT(Usuarios_Sucursales[Sucursal_ID], [Email] = USEREMAIL()))",
+    "OrderBy": "[KPI_ID].[Categoria], [KPI_ID].[Nombre]",
+    "GroupBy": "Estado_KPI",
+    "Options": {
+      "ShowSearch": true,
+      "ShowSelect": false,
+      "AllowInlineEdit": false
+    }
+  },
+  {
+    "ViewName": "View_KPI_Detalle_Historico",
+    "TableName": "Registros_KPI",
+    "Type": "Table",
+    "Position": 12,
+    "ShowIf": "OR(USERROLE(\"Administrador\"), USERROLE(\"Encargado\"))",
+    "Columns": [
+      "KPI_ID",
+      "Sucursal_ID",
+      "Periodo_Inicio",
+      "Periodo_Fin",
+      "Valor",
+      "Estado_KPI",
+      "Tendencia",
+      "Fecha_Calculo"
+    ],
+    "OrderBy": "Fecha_Calculo DESC",
+    "GroupBy": "KPI_ID",
+    "Options": {
+      "ShowSearch": true,
+      "ShowSelect": false,
+      "AllowInlineEdit": false
+    }
+  },
+  {
+    "ViewName": "View_Capacitaciones_Admin",
+    "TableName": "Capacitaciones",
+    "Type": "Table",
+    "Position": 13,
+    "ShowIf": "USERROLE(\"Administrador\")",
+    "Columns": [
+      "Titulo",
+      "Categoria",
+      "Sucursal_ID",
+      "Estado",
+      "Version",
+      "Duracion_Min",
+      "Tipo",
+      "Es_Obligatoria",
+      "Frecuencia_Renovacion_Meses"
+    ],
+    "OrderBy": "Sucursal_ID, Categoria, Titulo",
+    "GroupBy": "Estado",
+    "Options": {
+      "ShowSearch": true,
+      "ShowSelect": false,
+      "AllowInlineEdit": true
+    },
+    "Actions": [
+      "Capacitacion_Crear",
+      "Capacitacion_Aprobar",
+      "Capacitacion_Asignar_Usuarios"
+    ]
+  },
+  {
+    "ViewName": "View_Capacitaciones_Mis_Asignaciones",
+    "TableName": "Capacitaciones_Usuarios",
+    "Type": "Deck",
+    "Position": 14,
+    "ShowIf": "OR(USERROLE(\"Operador\"), USERROLE(\"Encargado\"))",
+    "Columns": [
+      "Capac_ID",
+      "Estado",
+      "Fecha_Asignacion",
+      "Fecha_Vencimiento",
+      "Fecha_Completado",
+      "Puntuacion_Examen"
+    ],
+    "RowFilter": "[Usuario_ID] = USEREMAIL()",
+    "OrderBy": "Fecha_Vencimiento",
+    "GroupBy": "Estado",
+    "Options": {
+      "ShowSearch": true,
+      "ShowSelect": false,
+      "AllowInlineEdit": false
+    },
+    "Actions": [
+      "Capacitacion_Iniciar",
+      "Capacitacion_Completar"
+    ]
+  },
+  {
+    "ViewName": "View_Capacitaciones_Gestion_Encargado",
+    "TableName": "Capacitaciones_Usuarios",
+    "Type": "Table",
+    "Position": 15,
+    "ShowIf": "USERROLE(\"Encargado\")",
+    "Columns": [
+      "Usuario_ID",
+      "Capac_ID",
+      "Estado",
+      "Fecha_Asignacion",
+      "Fecha_Vencimiento",
+      "Fecha_Completado",
+      "Puntuacion_Examen"
+    ],
+    "RowFilter": "IN([Sucursal_ID], SELECT(Usuarios_Sucursales[Sucursal_ID], [Email] = USEREMAIL()))",
+    "OrderBy": "Fecha_Vencimiento",
+    "GroupBy": "Estado",
+    "Options": {
+      "ShowSearch": true,
+      "ShowSelect": true,
+      "AllowInlineEdit": true
+    },
+    "Actions": [
+      "Capacitacion_Asignar_Nueva",
+      "Capacitacion_Eximir"
+    ]
+  },
+  {
+    "ViewName": "View_Incidencias_Admin_Todas",
+    "TableName": "Incidencias",
+    "Type": "Table",
+    "Position": 16,
+    "ShowIf": "USERROLE(\"Administrador\")",
+    "Columns": [
+      "Titulo",
+      "Tipo",
+      "Severidad",
+      "Sucursal_ID",
+      "Estado",
+      "Reportada_Por",
+      "Asignada_A",
+      "Fecha_Reporte",
+      "Tiempo_Resolucion_Horas",
+      "SLA_Horas"
+    ],
+    "OrderBy": "Fecha_Reporte DESC",
+    "GroupBy": "Severidad",
+    "Options": {
+      "ShowSearch": true,
+      "ShowSelect": false,
+      "AllowInlineEdit": true
+    },
+    "Actions": [
+      "Incidencia_Asignar",
+      "Incidencia_Escalar",
+      "Incidencia_Resolver",
+      "Incidencia_Cerrar"
+    ]
+  },
+  {
+    "ViewName": "View_Incidencias_Encargado_Mi_Sucursal",
+    "TableName": "Incidencias",
+    "Type": "Deck",
+    "Position": 17,
+    "ShowIf": "USERROLE(\"Encargado\")",
+    "Columns": [
+      "Titulo",
+      "Tipo",
+      "Severidad",
+      "Estado",
+      "Asignada_A",
+      "Fecha_Reporte",
+      "Tiempo_Resolucion_Horas"
+    ],
+    "RowFilter": "IN([Sucursal_ID], SELECT(Usuarios_Sucursales[Sucursal_ID], [Email] = USEREMAIL()))",
+    "OrderBy": "Fecha_Reporte DESC",
+    "GroupBy": "Estado",
+    "Options": {
+      "ShowSearch": true,
+      "ShowSelect": false,
+      "AllowInlineEdit": false
+    },
+    "Actions": [
+      "Incidencia_Asignar",
+      "Incidencia_Resolver",
+      "Incidencia_Escalar",
+      "Incidencia_Reportar_Nueva"
+    ]
+  },
+  {
+    "ViewName": "View_Incidencias_Operador_Mi_Sucursal",
+    "TableName": "Incidencias",
+    "Type": "Deck",
+    "Position": 18,
+    "ShowIf": "USERROLE(\"Operador\")",
+    "Columns": [
+      "Titulo",
+      "Tipo",
+      "Severidad",
+      "Estado",
+      "Fecha_Reporte"
+    ],
+    "RowFilter": "AND(IN([Sucursal_ID], SELECT(Usuarios_Sucursales[Sucursal_ID], [Email] = USEREMAIL())), OR([Reportada_Por] = USEREMAIL(), [Asignada_A] = USEREMAIL()))",
+    "OrderBy": "Fecha_Reporte DESC",
+    "GroupBy": "Estado",
+    "Options": {
+      "ShowSearch": true,
+      "ShowSelect": false,
+      "AllowInlineEdit": false
+    },
+    "Actions": [
+      "Incidencia_Reportar_Nueva",
+      "Incidencia_Resolver"
+    ]
+  },
+  {
+    "ViewName": "View_Incidencia_Formulario_Nueva",
+    "TableName": "Incidencias",
+    "Type": "Form",
+    "Position": 19,
+    "ShowIf": "OR(USERROLE(\"Administrador\"), USERROLE(\"Encargado\"), USERROLE(\"Operador\"))",
+    "Columns": [
+      "Titulo",
+      "Tipo",
+      "Severidad",
+      "Descripcion",
+      "Sucursal_ID",
+      "Evidencia_Inicial"
+    ],
+    "InitialValues": {
+      "Reportada_Por": "USEREMAIL()",
+      "Fecha_Reporte": "NOW()",
+      "Estado": "\"Abierta\"",
+      "Origen_Incidencia": "\"Manual\"",
+      "Sync_Pending?": "TRUE"
+    },
+    "Options": {
+      "ShowCancelButton": true,
+      "ShowSaveButton": true
+    }
+  },
+  {
+    "ViewName": "View_Incidencia_Formulario_Resolver",
+    "TableName": "Incidencias",
+    "Type": "Form",
+    "Position": 20,
+    "ShowIf": "OR(USERROLE(\"Administrador\"), USERROLE(\"Encargado\"), AND(USERROLE(\"Operador\"), [Asignada_A] = USEREMAIL()))",
+    "Columns": [
+      "Estado",
+      "Solucion",
+      "Fecha_Cierre"
+    ],
+    "InitialValues": {
+      "Fecha_Cierre": "NOW()",
+      "Tiempo_Resolucion_Horas": "([Fecha_Cierre] - [Fecha_Reporte]) * 24",
+      "Sync_Pending?": "TRUE"
+    },
+    "Options": {
+      "ShowCancelButton": true,
+      "ShowSaveButton": true
+    }
+  },
+  {
+    "ViewName": "View_Dashboard_Operaciones_Admin",
+    "TableName": "Tarea_Ejecuciones",
+    "Type": "Dashboard",
+    "Position": 21,
+    "ShowIf": "USERROLE(\"Administrador\")",
+    "Columns": [
+      "Tarea_ID",
+      "Sucursal_ID",
+      "Estado",
+      "Fecha_Ejecucion"
+    ],
+    "Options": {
+      "Charts": [
+        {
+          "Name": "Cumplimiento Tareas por Sucursal (Semana)",
+          "Type": "Bar",
+          "Dimension": "[Sucursal_ID].[Nombre]",
+          "Measure": "COUNT(FILTER(\"Tarea_Ejecuciones\", AND([Sucursal_ID] = [_THISROW].[Sucursal_ID], [Fecha_Ejecucion] >= TODAY() - 7, [Estado] = \"Completada\"))) / COUNT(FILTER(\"Tarea_Programaciones\", AND([Sucursal_ID] = [_THISROW].[Sucursal_ID], [Es_Activa] = TRUE))) * 100",
+          "Filter": "[Fecha_Ejecucion] >= TODAY() - 7"
+        },
+        {
+          "Name": "Incidencias por Tipo y Severidad",
+          "Type": "Bar",
+          "Dimension": "Tipo",
+          "Measure": "COUNT(*)",
+          "Filter": "[Fecha_Reporte] >= TODAY() - 30",
+          "Series": [
+            {
+              "Name": "Crítica",
+              "Expression": "COUNT(FILTER(\"Incidencias\", AND([Tipo] = [_THISROW].[Tipo], [Severidad] = \"Critica\", [Fecha_Reporte] >= TODAY() - 30)))"
+            },
+            {
+              "Name": "Alta",
+              "Expression": "COUNT(FILTER(\"Incidencias\", AND([Tipo] = [_THISROW].[Tipo], [Severidad] = \"Alta\", [Fecha_Reporte] >= TODAY() - 30)))"
+            },
+            {
+              "Name": "Media",
+              "Expression": "COUNT(FILTER(\"Incidencias\", AND([Tipo] = [_THISROW].[Tipo], [Severidad] = \"Media\", [Fecha_Reporte] >= TODAY() - 30)))"
+            },
+            {
+              "Name": "Baja",
+              "Expression": "COUNT(FILTER(\"Incidencias\", AND([Tipo] = [_THISROW].[Tipo], [Severidad] = \"Baja\", [Fecha_Reporte] >= TODAY() - 30)))"
+            }
+          ]
+        },
+        {
+          "Name": "Tiempo Medio Resolución por Severidad",
+          "Type": "Bar",
+          "Dimension": "Severidad",
+          "Measure": "AVERAGE([Tiempo_Resolucion_Horas])",
+          "Filter": "AND([Estado] = \"Cerrada\", [Fecha_Cierre] >= TODAY() - 30)"
+        }
+      ],
+      "KPIs": [
+        {
+          "Name": "Tareas Completadas Hoy (Global)",
+          "Expression": "COUNT(FILTER(\"Tarea_Ejecuciones\", AND([Fecha_Ejecucion] = TODAY(), [Estado] = \"Completada\")))",
+          "Icon": "check-circle",
+          "Color": "Success"
+        },
+        {
+          "Name": "Tareas Omitidas Hoy (Global)",
+          "Expression": "COUNT(FILTER(\"Tarea_Ejecuciones\", AND([Fecha_Ejecucion] = TODAY(), [Estado] = \"Omitida\")))",
+          "Icon": "x-circle",
+          "Color": "Danger"
+        },
+        {
+          "Name": "Incidencias Abiertas Críticas/Alta",
+          "Expression": "COUNT(FILTER(\"Incidencias\", AND(IN([Severidad], LIST(\"Critica\", \"Alta\")), IN([Estado], LIST(\"Abierta\", \"En_Proceso\")))))",
+          "Icon": "alert-triangle",
+          "Color": "Danger"
+        },
+        {
+          "Name": "% Capacitaciones al Día (Global)",
+          "Expression": "ROUND(COUNT(FILTER(\"Capacitaciones_Usuarios\", [Estado] = \"Completada\")) / COUNT(FILTER(\"Capacitaciones_Usuarios\", [Estado] <> \"Eximida\")) * 100, 1)",
+          "Icon": "book-open",
+          "Color": "Info"
+        }
+      ]
+    }
+  },
+  {
+    "ViewName": "View_Dashboard_Operaciones_Encargado",
+    "TableName": "Tarea_Ejecuciones",
+    "Type": "Dashboard",
+    "Position": 22,
+    "ShowIf": "USERROLE(\"Encargado\")",
+    "Columns": [
+      "Tarea_ID",
+      "Estado",
+      "Fecha_Ejecucion"
+    ],
+    "RowFilter": "IN([Sucursal_ID], SELECT(Usuarios_Sucursales[Sucursal_ID], [Email] = USEREMAIL()))",
+    "Options": {
+      "Charts": [
+        {
+          "Name": "Mis Tareas esta Semana",
+          "Type": "Bar",
+          "Dimension": "WEEKDAY([Fecha_Ejecucion])",
+          "Measure": "COUNT(*)",
+          "Filter": "AND([Fecha_Ejecucion] >= TODAY() - 7, [Estado] = \"Completada\")",
+          "Series": [
+            {
+              "Name": "Completadas",
+              "Expression": "COUNT(FILTER(\"Tarea_Ejecuciones\", AND([Sucursal_ID] = [_THISROW].[Sucursal_ID], [Fecha_Ejecucion] = [_THISROW].[Fecha_Ejecucion], [Estado] = \"Completada\")))"
+            },
+            {
+              "Name": "Omitidas",
+              "Expression": "COUNT(FILTER(\"Tarea_Ejecuciones\", AND([Sucursal_ID] = [_THISROW].[Sucursal_ID], [Fecha_Ejecucion] = [_THISROW].[Fecha_Ejecucion], [Estado] = \"Omitida\")))"
+            }
+          ]
+        },
+        {
+          "Name": "Incidencias por Estado",
+          "Type": "Pie",
+          "Dimension": "Estado",
+          "Measure": "COUNT(*)",
+          "Filter": "IN([Sucursal_ID], SELECT(Usuarios_Sucursales[Sucursal_ID], [Email] = USEREMAIL()))"
+        }
+      ],
+      "KPIs": [
+        {
+          "Name": "Tareas Hoy Completadas",
+          "Expression": "COUNT(FILTER(\"Tarea_Ejecuciones\", AND([Fecha_Ejecucion] = TODAY(), [Estado] = \"Completada\", IN([Sucursal_ID], SELECT(Usuarios_Sucursales[Sucursal_ID], [Email] = USEREMAIL())))))",
+          "Icon": "check-circle",
+          "Color": "Success"
+        },
+        {
+          "Name": "Tareas Hoy Pendientes",
+          "Expression": "COUNT(FILTER(\"Tarea_Ejecuciones\", AND([Fecha_Ejecucion] = TODAY(), [Estado] = \"Pendiente\", IN([Sucursal_ID], SELECT(Usuarios_Sucursales[Sucursal_ID], [Email] = USEREMAIL())))))",
+          "Icon": "clock",
+          "Color": "Warning"
+        },
+        {
+          "Name": "Incidencias Abiertas Mi Sucursal",
+          "Expression": "COUNT(FILTER(\"Incidencias\", AND([Estado] = \"Abierta\", IN([Sucursal_ID], SELECT(Usuarios_Sucursales[Sucursal_ID], [Email] = USEREMAIL())))))",
+          "Icon": "alert-circle",
+          "Color": "Warning"
+        },
+        {
+          "Name": "Capacitaciones Vencidas Equipo",
+          "Expression": "COUNT(FILTER(\"Capacitaciones_Usuarios\", AND([Estado] = \"Vencida\", IN([Sucursal_ID], SELECT(Usuarios_Sucursales[Sucursal_ID], [Email] = USEREMAIL())))))",
+          "Icon": "alert-triangle",
+          "Color": "Danger"
+        }
+      ]
+    }
+  }
+]

@@ -1,0 +1,74 @@
+Tabla_Objetivo,Nombre_Columna,Tipo_Dato,Es_Key?,Es_Ref?,Ref_Table,Initial_Value,App_Formula,Show_If,Valid_If,Descripcion,Editable_En_Formulario?,Orden,Fase
+Ordenes_Transferencia,Orden_ID,Text,TRUE,FALSE,,UNIQUEID(),,,FALSE,"Clave única orden",FALSE,1,4
+Ordenes_Transferencia,Estado,Enum,FALSE,FALSE,,Borrador,,,"IN([_THIS], LIST(\"Borrador\", \"Solicitada\", \"Aprobada_Origen\", \"Aprobada_Destino\", \"En_Preparacion\", \"Despachada\", \"En_Transito\", \"Recibida_Completa\", \"Recibida_Con_Diferencias\", \"Cancelada\"))","Estado del flujo",FALSE,2,4
+Ordenes_Transferencia,Sucursal_Origen_ID,Ref,FALSE,TRUE,Sucursales,LOOKUP(USEREMAIL(), "Usuarios_Sucursales", "Email", "Sucursal_ID"),FALSE,"IN([_THIS], SELECT(Sucursales[Sucursal_ID], [Activa?]=TRUE))","Sucursal que envía",TRUE,3,4
+Ordenes_Transferencia,Sucursal_Destino_ID,Ref,FALSE,TRUE,Sucursales,,,,,"Sucursal que recibe (distinta a origen)",TRUE,4,4
+Ordenes_Transferencia,Solicitada_Por,Text,FALSE,FALSE,,USEREMAIL(),,,FALSE,"Quién solicita",FALSE,5,4
+Ordenes_Transferencia,Fecha_Solicitud,DateTime,FALSE,FALSE,,NOW(),,,FALSE,"Cuándo se solicitó",FALSE,6,4
+Ordenes_Transferencia,Aprobada_Origen_Por,Text,FALSE,FALSE,,,,,FALSE,"Encargado origen aprueba salida",FALSE,7,4
+Ordenes_Transferencia,Fecha_Aprobacion_Origen,DateTime,FALSE,FALSE,,,,,FALSE,"Cuándo aprobó origen",FALSE,8,4
+Ordenes_Transferencia,Aprobada_Destino_Por,Text,FALSE,FALSE,,,,,FALSE,"Encargado destino aprueba entrada",FALSE,9,4
+Ordenes_Transferencia,Fecha_Aprobacion_Destino,DateTime,FALSE,FALSE,,,,,FALSE,"Cuándo aprobó destino",FALSE,10,4
+Ordenes_Transferencia,Preparada_Por,Text,FALSE,FALSE,,,,,FALSE,"Operador que prepara items",FALSE,11,4
+Ordenes_Transferencia,Fecha_Preparacion,DateTime,FALSE,FALSE,,,,,FALSE,"Cuándo se preparó",FALSE,12,4
+Ordenes_Transferencia,Despachada_Por,Text,FALSE,FALSE,,,,,FALSE,"Quién despacha",FALSE,13,4
+Ordenes_Transferencia,Fecha_Despacho,DateTime,FALSE,FALSE,,,,,FALSE,"Cuándo salió",FALSE,14,4
+Ordenes_Transferencia,Recibida_Por,Text,FALSE,FALSE,,,,,FALSE,"Quién recibe en destino",FALSE,15,4
+Ordenes_Transferencia,Fecha_Recepcion,DateTime,FALSE,FALSE,,,,,FALSE,"Cuándo llegó",FALSE,16,4
+Ordenes_Transferencia,Observaciones,LongText,FALSE,FALSE,,,,,"Notas generales",TRUE,17,4
+Ordenes_Transferencia,Fecha_Creacion,DateTime,FALSE,FALSE,,NOW(),,,FALSE,"Auditoría",FALSE,18,4
+Ordenes_Transferencia,Creado_Por,Text,FALSE,FALSE,,USEREMAIL(),,,FALSE,"Auditoría",FALSE,19,4
+Ordenes_Transferencia,ID,Text,TRUE,FALSE,,UNIQUEID(),,,FALSE,"Key alias",FALSE,20,4
+Ordenes_Transferencia,Created_At,DateTime,FALSE,FALSE,,NOW(),,,FALSE,"Auditoría estándar",FALSE,21,4
+Ordenes_Transferencia,Created_By,Text,FALSE,FALSE,,USEREMAIL(),,,FALSE,"Auditoría estándar",FALSE,22,4
+Ordenes_Transferencia,Updated_At,DateTime,FALSE,FALSE,,,NOW(),,FALSE,"Auditoría estándar",FALSE,23,4
+Ordenes_Transferencia,Updated_By,Text,FALSE,FALSE,,,USEREMAIL(),,FALSE,"Auditoría estándar",FALSE,24,4
+Ordenes_Transferencia,Deleted?,Yes/No,FALSE,FALSE,,FALSE,,,FALSE,"Soft delete",FALSE,25,4
+Ordenes_Transferencia,Sucursal_ID,Ref,FALSE,TRUE,Sucursales,,LOOKUP([Sucursal_Origen_ID], "Sucursales", "Sucursal_ID", "Sucursal_ID"),FALSE,"Security Filter: OR(origen, destino)",FALSE,26,4
+Ordenes_Transferencia,Sync_Pending?,Yes/No,FALSE,FALSE,,TRUE,,,FALSE,"Sync offline",FALSE,27,4
+Items_Transferencia,Item_ID,Text,TRUE,FALSE,,UNIQUEID(),,,FALSE,"Clave única item",FALSE,1,4
+Items_Transferencia,Orden_ID,Ref,FALSE,TRUE,Ordenes_Transferencia,,,,,"Orden padre",FALSE,2,4
+Items_Transferencia,Ingrediente_ID,Ref,FALSE,TRUE,Ingredientes_y_Stock,,,,,"Ingrediente a transferir",TRUE,3,4
+Items_Transferencia,Cantidad_Solicitada,Decimal,FALSE,FALSE,,,,,">0","Cantidad pedida",TRUE,4,4
+Items_Transferencia,Unidad_Medida,Text,FALSE,FALSE,,LOOKUP([Ingrediente_ID], "Ingredientes_y_Stock", "Ingrediente_ID", "Unidad_Base"),FALSE,,"Unidad (auto)",FALSE,5,4
+Items_Transferencia,Cantidad_Preparada,Decimal,FALSE,FALSE,,,,,">=0","Cantidad realmente preparada",TRUE,6,4
+Items_Transferencia,Cantidad_Despachada,Decimal,FALSE,FALSE,,,,,">=0","Cantidad que sale",TRUE,7,4
+Items_Transferencia,Cantidad_Recibida,Decimal,FALSE,FALSE,,,,,">=0","Cantidad que llega",TRUE,8,4
+Items_Transferencia,Diferencia_Recepcion,Decimal,FALSE,FALSE,,[Cantidad_Recibida] - [Cantidad_Despachada],FALSE,,,"Diff recepción",FALSE,9,4
+Items_Transferencia,Estado_Item,Enum,FALSE,FALSE,,Pendiente,,,"IN([_THIS], LIST(\"Pendiente\", \"Preparado\", \"Despachado\", \"Recibido\", \"Con_Diferencias\"))","Estado del item",FALSE,10,4
+Items_Transferencia,Observacion_Preparador,LongText,FALSE,FALSE,,,,,"Nota preparador",TRUE,11,4
+Items_Transferencia,Observacion_Receptor,LongText,FALSE,FALSE,,,,,"Nota receptor",TRUE,12,4
+Items_Transferencia,Fecha_Creacion,DateTime,FALSE,FALSE,,NOW(),,,FALSE,"Auditoría",FALSE,13,4
+Items_Transferencia,Creado_Por,Text,FALSE,FALSE,,USEREMAIL(),,,FALSE,"Auditoría",FALSE,14,4
+Items_Transferencia,Sync_Pending?,Yes/No,FALSE,FALSE,,TRUE,,,FALSE,"Sync offline",FALSE,15,4
+Items_Transferencia,ID,Text,TRUE,FALSE,,UNIQUEID(),,,FALSE,"Key alias",FALSE,16,4
+Items_Transferencia,Created_At,DateTime,FALSE,FALSE,,NOW(),,,FALSE,"Auditoría estándar",FALSE,17,4
+Items_Transferencia,Created_By,Text,FALSE,FALSE,,USEREMAIL(),,,FALSE,"Auditoría estándar",FALSE,18,4
+Items_Transferencia,Updated_At,DateTime,FALSE,FALSE,,,NOW(),,FALSE,"Auditoría estándar",FALSE,19,4
+Items_Transferencia,Updated_By,Text,FALSE,FALSE,,,USEREMAIL(),,FALSE,"Auditoría estándar",FALSE,20,4
+Items_Transferencia,Deleted?,Yes/No,FALSE,FALSE,,FALSE,,,FALSE,"Soft delete",FALSE,21,4
+Items_Transferencia,Sucursal_ID,Ref,FALSE,TRUE,Sucursales,,LOOKUP([Orden_ID], "Ordenes_Transferencia", "Orden_ID", "Sucursal_Origen_ID"),FALSE,"Security Filter hereda de orden",FALSE,22,4
+Recepciones_Transferencia,Recepcion_ID,Text,TRUE,FALSE,,UNIQUEID(),,,FALSE,"Clave única recepción",FALSE,1,4
+Recepciones_Transferencia,Orden_ID,Ref,FALSE,TRUE,Ordenes_Transferencia,,,,,"Orden origen",FALSE,2,4
+Recepciones_Transferencia,Item_ID,Ref,FALSE,TRUE,Items_Transferencia,,,,,"Item origen",FALSE,3,4
+Recepciones_Transferencia,Ingrediente_ID,Ref,FALSE,TRUE,Ingredientes_y_Stock,,,,,"Ingrediente recibido",FALSE,4,4
+Recepciones_Transferencia,Cantidad_Recibida,Decimal,FALSE,FALSE,,,,,">=0","Cantidad física recibida",TRUE,5,4
+Recepciones_Transferencia,Cantidad_Esperada,Decimal,FALSE,FALSE,,LOOKUP([Item_ID], "Items_Transferencia", "Item_ID", "Cantidad_Despachada"),FALSE,,">=0","Cantidad que debería llegar",FALSE,6,4
+Recepciones_Transferencia,Diferencia,Decimal,FALSE,FALSE,,[Cantidad_Recibida] - [Cantidad_Esperada],FALSE,,,"Diff = Recibido - Esperado",FALSE,7,4
+Recepciones_Transferencia,Estado_Recepcion,Enum,FALSE,FALSE,,Completa,,,"IN([_THIS], LIST(\"Completa\", \"Con_Diferencias\", \"Parcial\", \"Rechazada\"))","Estado",FALSE,8,4
+Recepciones_Transferencia,Recibida_Por,Text,FALSE,FALSE,,USEREMAIL(),,,FALSE,"Quién recibe",FALSE,9,4
+Recepciones_Transferencia,Fecha_Recepcion,DateTime,FALSE,FALSE,,NOW(),,,FALSE,"Cuándo",FALSE,10,4
+Recepciones_Transferencia,Observaciones,LongText,FALSE,FALSE,,,,,"Notas recepción",TRUE,11,4
+Recepciones_Transferencia,Foto_Evidencia,Image,FALSE,FALSE,,,,,"Foto opcional",TRUE,12,4
+Recepciones_Transferencia,Requiere_Ajuste?,Yes/No,FALSE,FALSE,,FALSE,,,,"Si TRUE genera ajuste/merma",FALSE,13,4
+Recepciones_Transferencia,Ajuste_Generado_ID,Text,FALSE,FALSE,,,,,"Ref a Ajustes_Inventario (Fase 3)",FALSE,14,4
+Recepciones_Transferencia,Fecha_Creacion,DateTime,FALSE,FALSE,,NOW(),,,FALSE,"Auditoría",FALSE,15,4
+Recepciones_Transferencia,Creado_Por,Text,FALSE,FALSE,,USEREMAIL(),,,FALSE,"Auditoría",FALSE,16,4
+Recepciones_Transferencia,Sync_Pending?,Yes/No,FALSE,FALSE,,TRUE,,,FALSE,"Sync offline",FALSE,17,4
+Recepciones_Transferencia,ID,Text,TRUE,FALSE,,UNIQUEID(),,,FALSE,"Key alias",FALSE,18,4
+Recepciones_Transferencia,Created_At,DateTime,FALSE,FALSE,,NOW(),,,FALSE,"Auditoría estándar",FALSE,19,4
+Recepciones_Transferencia,Created_By,Text,FALSE,FALSE,,USEREMAIL(),,,FALSE,"Auditoría estándar",FALSE,20,4
+Recepciones_Transferencia,Updated_At,DateTime,FALSE,FALSE,,,NOW(),,FALSE,"Auditoría estándar",FALSE,21,4
+Recepciones_Transferencia,Updated_By,Text,FALSE,FALSE,,,USEREMAIL(),,FALSE,"Auditoría estándar",FALSE,22,4
+Recepciones_Transferencia,Deleted?,Yes/No,FALSE,FALSE,,FALSE,,,FALSE,"Soft delete",FALSE,23,4
+Recepciones_Transferencia,Sucursal_ID,Ref,FALSE,TRUE,Sucursales,,LOOKUP([Orden_ID], "Ordenes_Transferencia", "Orden_ID", "Sucursal_Destino_ID"),FALSE,"Security Filter hereda de orden destino",FALSE,24,4

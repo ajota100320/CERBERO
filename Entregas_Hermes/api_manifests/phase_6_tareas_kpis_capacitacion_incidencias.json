@@ -1,0 +1,109 @@
+{
+  "phase": 6,
+  "name": "Tareas + KPIs + Capacitación + Incidencias",
+  "description": "Gestión operativa completa: tareas programadas con checklists, KPIs automatizados con semáforos, capacitaciones con renovación, incidencias con SLA y escalado",
+  "dependencies": [1, 2, 3, 4, 5],
+  "estimated_time_minutes": 180,
+  "manifest": {
+    "tables_new": [
+      {
+        "source_file": "Fase6_Tareas_KPIs_Capacitacion_Incidencias/01_Tablas_Nuevas/Tareas.csv",
+        "table_name": "Tareas",
+        "key_column": "Tarea_ID",
+        "is_part_of": false,
+        "security_filter": "OR(USERROLE(\"Administrador\"), AND([Es_Activa?] = TRUE, IN([Sucursal_ID], SELECT(Usuarios_Sucursales[Sucursal_ID], [Email] = USEREMAIL()))))"
+      },
+      {
+        "source_file": "Fase6_Tareas_KPIs_Capacitacion_Incidencias/01_Tablas_Nuevas/Tarea_Programaciones.csv",
+        "table_name": "Tarea_Programaciones",
+        "key_column": "Prog_ID",
+        "is_part_of": false,
+        "security_filter": "OR(USERROLE(\"Administrador\"), IN([Sucursal_ID], SELECT(Usuarios_Sucursales[Sucursal_ID], [Email] = USEREMAIL())))"
+      },
+      {
+        "source_file": "Fase6_Tareas_KPIs_Capacitacion_Incidencias/01_Tablas_Nuevas/Tarea_Ejecuciones.csv",
+        "table_name": "Tarea_Ejecuciones",
+        "key_column": "Ejec_ID",
+        "is_part_of": false,
+        "security_filter": "OR(USERROLE(\"Administrador\"), IN([Sucursal_ID], SELECT(Usuarios_Sucursales[Sucursal_ID], [Email] = USEREMAIL())))"
+      },
+      {
+        "source_file": "Fase6_Tareas_KPIs_Capacitacion_Incidencias/01_Tablas_Nuevas/KPI_Definiciones.csv",
+        "table_name": "KPI_Definiciones",
+        "key_column": "KPI_ID",
+        "is_part_of": false,
+        "security_filter": "OR(USERROLE(\"Administrador\"), AND([Es_Activa?] = TRUE, OR([Sucursal_ID] = \"\", IN([Sucursal_ID], SELECT(Usuarios_Sucursales[Sucursal_ID], [Email] = USEREMAIL())))))"
+      },
+      {
+        "source_file": "Fase6_Tareas_KPIs_Capacitacion_Incidencias/01_Tablas_Nuevas/Registros_KPI.csv",
+        "table_name": "Registros_KPI",
+        "key_column": "Registro_ID",
+        "is_part_of": false,
+        "security_filter": "OR(USERROLE(\"Administrador\"), IN([Sucursal_ID], SELECT(Usuarios_Sucursales[Sucursal_ID], [Email] = USEREMAIL())))"
+      },
+      {
+        "source_file": "Fase6_Tareas_KPIs_Capacitacion_Incidencias/01_Tablas_Nuevas/Capacitaciones.csv",
+        "table_name": "Capacitaciones",
+        "key_column": "Capac_ID",
+        "is_part_of": false,
+        "security_filter": "OR(USERROLE(\"Administrador\"), AND([Estado] = \"Aprobada\", IN([Sucursal_ID], SELECT(Usuarios_Sucursales[Sucursal_ID], [Email] = USEREMAIL()))))"
+      },
+      {
+        "source_file": "Fase6_Tareas_KPIs_Capacitacion_Incidencias/01_Tablas_Nuevas/Capacitaciones_Usuarios.csv",
+        "table_name": "Capacitaciones_Usuarios",
+        "key_column": "Cap_Usu_ID",
+        "is_part_of": false,
+        "security_filter": "OR(USERROLE(\"Administrador\"), AND([Usuario_ID] = USEREMAIL(), IN([Sucursal_ID], SELECT(Usuarios_Sucursales[Sucursal_ID], [Email] = USEREMAIL()))))"
+      },
+      {
+        "source_file": "Fase6_Tareas_KPIs_Capacitacion_Incidencias/01_Tablas_Nuevas/Incidencias.csv",
+        "table_name": "Incidencias",
+        "key_column": "Inc_ID",
+        "is_part_of": false,
+        "security_filter": "OR(USERROLE(\"Administrador\"), IN([Sucursal_ID], SELECT(Usuarios_Sucursales[Sucursal_ID], [Email] = USEREMAIL())))"
+      }
+    ],
+    "tables_extend": [
+      {
+        "table_name": "Ingredientes_y_Stock",
+        "audit_columns_file": "Fase6_Tareas_KPIs_Capacitacion_Incidencias/03_Columnas_Auditoria_Por_Tabla/Columnas_Fase6.csv"
+      }
+    ],
+    "actions": [
+      {"file": "Fase6_Tareas_KPIs_Capacitacion_Incidencias/04_Actions_Fase6.json", "count": 20}
+    ],
+    "bots": [
+      {"file": "Fase6_Tareas_KPIs_Capacitacion_Incidencias/05_Bots_Fase6.json", "count": 8}
+    ],
+    "tasks": [
+      {"file": "Fase6_Tareas_KPIs_Capacitacion_Incidencias/06_Tasks_Bots_Fase6.json", "count": 19}
+    ],
+    "views": [
+      {"file": "Fase6_Tareas_KPIs_Capacitacion_Incidencias/07_Views_Fase6.json", "count": 22}
+    ],
+    "config_global_updates": [
+      {"Config_ID": "CFG_019", "Clave": "UMBRAL_CUMPLIMIENTO_TAREAS_VERDE", "Valor": "95", "Tipo": "Number"},
+      {"Config_ID": "CFG_020", "Clave": "UMBRAL_CUMPLIMIENTO_TAREAS_AMARILLO", "Valor": "85", "Tipo": "Number"},
+      {"Config_ID": "CFG_021", "Clave": "SLA_INCIDENCIA_CRITICA_HORAS", "Valor": "1", "Tipo": "Number"},
+      {"Config_ID": "CFG_022", "Clave": "SLA_INCIDENCIA_ALTA_HORAS", "Valor": "4", "Tipo": "Number"},
+      {"Config_ID": "CFG_023", "Clave": "SLA_INCIDENCIA_MEDIA_HORAS", "Valor": "8", "Tipo": "Number"},
+      {"Config_ID": "CFG_024", "Clave": "SLA_INCIDENCIA_BAJA_HORAS", "Valor": "24", "Tipo": "Number"},
+      {"Config_ID": "CFG_025", "Clave": "DIAS_ALERTA_CAPACITACION_VENCIMIENTO", "Valor": "7,3,1", "Tipo": "Text"}
+    ],
+    "deployment_steps": [
+      "create_8_new_tables_in_sheets",
+      "link_tables_in_appsheet",
+      "apply_audit_columns_to_all",
+      "apply_security_filters",
+      "create_actions",
+      "import_bots",
+      "import_tasks",
+      "import_views",
+      "update_config_global",
+      "regenerate_structure",
+      "deploy_staging",
+      "run_validation_tests"
+    ],
+    "validation_tests": 28
+  }
+}

@@ -1,0 +1,9 @@
+Registro_ID,KPI_ID,Sucursal_ID,Periodo_Inicio,Periodo_Fin,Valor,Estado_KPI,Tendencia,Fecha_Calculo,Calculado_Por,Sync_Pending?
+REG_001,KPI_001,[Sucursal_ID_Suc1],TODAY()-30,TODAY(),14.50,"Amarillo","Estable",NOW(),USEREMAIL(),TRUE
+REG_002,KPI_002,[Sucursal_ID_Suc1],TODAY()-30,TODAY(),3.2,"Verde","Mejorando",NOW(),USEREMAIL(),TRUE
+REG_003,KPI_003,[Sucursal_ID_Suc1],TODAY()-7,TODAY(),9,"Verde","Estable",NOW(),USEREMAIL(),TRUE
+REG_004,KPI_004,[Sucursal_ID_Suc1],TODAY()-7,TODAY(),92,"Amarillo","Empeorando",NOW(),USEREMAIL(),TRUE
+REG_005,KPI_005,[Sucursal_ID_Suc1],TODAY()-30,TODAY(),6.5,"Verde","Estable",NOW(),USEREMAIL(),TRUE
+REG_006,KPI_006,[Sucursal_ID_Suc1],TODAY()-30,TODAY(),85,"Amarillo","Estable",NOW(),USEREMAIL(),TRUE
+REG_007,KPI_007,[Sucursal_ID_Suc1],TODAY()-30,TODAY(),4.1,"Verde","Mejorando",NOW(),USEREMAIL(),TRUE
+REG_008,KPI_008,[Sucursal_ID_Suc1],TODAY(),TODAY(),1,"Verde","Estable",NOW(),USEREMAIL(),TRUE

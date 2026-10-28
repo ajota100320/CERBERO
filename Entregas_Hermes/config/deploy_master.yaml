@@ -1,0 +1,74 @@
+# Master Deployment Configuration
+# ERP AppSheet Templo del Smash
+# =============================================================================
+
+project:
+  name: "ERP Templo del Smash"
+  spreadsheet_id: "YOUR_SPREADSHEET_ID_HERE"  # ← REEMPLAZAR CON TU ID
+  app_name: "TemploDelSmash_ERP"
+  owner_email: "tu-email@dominio.com"
+
+environments:
+  staging:
+    name: "Staging"
+    appsheet_deployment: "staging"
+    test_users:
+      - role: "Administrador"
+        email: "admin@test.com"
+      - role: "Encargado"
+        email: "encargado1@test.com"
+        sucursal: "Sucursal 1"
+      - role: "Encargado"
+        email: "encargado2@test.com"
+        sucursal: "Sucursal 2"
+      - role: "Operador"
+        email: "operador1a@test.com"
+        sucursal: "Sucursal 1"
+      - role: "Operador"
+        email: "operador1b@test.com"
+        sucursal: "Sucursal 1"
+      - role: "Operador"
+        email: "operador2a@test.com"
+        sucursal: "Sucursal 2"
+      - role: "Operador"
+        email: "operador2b@test.com"
+        sucursal: "Sucursal 2"
+  
+  production:
+    name: "Production"
+    appsheet_deployment: "production"
+    # Usuarios reales se configuran en AppSheet > User Roles
+
+google_cloud:
+  project_id: "YOUR_GCP_PROJECT_ID"
+  service_account_path: "./credentials/service-account.json"
+  apis_enabled:
+    - "appsheet.googleapis.com"
+    - "sheets.googleapis.com"
+    - "drive.googleapis.com"
+    - "script.googleapis.com"
+
+appsheet:
+  api_base_url: "https://api.appsheet.com/api/v2"
+  # Autenticación via Service Account con domain-wide delegation
+  # o OAuth 2.0 con tu cuenta de propietario de la app
+
+deployment:
+  phases_order: [1, 2, 3, 4, 5, 6]
+  parallel_safe: false  # Fases secuenciales por dependencias
+  validation_required: true
+  rollback_on_failure: true
+  max_retries: 3
+  retry_delay_seconds: 30
+
+notifications:
+  on_phase_complete: true
+  on_phase_failed: true
+  on_all_complete: true
+  webhook_url: ""  # Opcional: Slack, Teams, Discord webhook
+
+logging:
+  level: "INFO"
+  file: "./logs/deploy_master.log"
+  max_size_mb: 10
+  backup_count: 5

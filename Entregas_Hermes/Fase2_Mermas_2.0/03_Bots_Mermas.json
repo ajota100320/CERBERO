@@ -1,0 +1,86 @@
+[
+  {
+    "BotName": "Bot_Merma_Nueva_Pendiente_Aprobacion",
+    "Description": "Notifica a Encargado de la sucursal cuando una merma pasa a Pendiente",
+    "Enabled": true,
+    "Event": {
+      "Source": "Data Change",
+      "TableName": "Registro_de_Mermas_y_Vencimientos",
+      "Condition": "AND([_THISROW_AFTER].[Estado_Merma] = \"Pendiente\", [_THISROW_BEFORE].[Estado_Merma] <> \"Pendiente\")"
+    },
+    "Process": {
+      "Type": "Task",
+      "TaskName": "Task_Notificar_Encargado_Merma_Pendiente"
+    }
+  },
+  {
+    "BotName": "Bot_Merma_Aprobada_Descontar_Stock",
+    "Description": "Al aprobar merma: descuenta stock de Ingredientes_y_Stock y registra auditoría",
+    "Enabled": true,
+    "Event": {
+      "Source": "Data Change",
+      "TableName": "Registro_de_Mermas_y_Vencimientos",
+      "Condition": "AND([_THISROW_AFTER].[Estado_Merma] = \"Aprobada\", [_THISROW_BEFORE].[Estado_Merma] <> \"Aprobada\")"
+    },
+    "Process": {
+      "Type": "Task",
+      "TaskName": "Task_Descontar_Stock_Merma_Aprobada"
+    }
+  },
+  {
+    "BotName": "Bot_Merma_Rechazada_Notificar_Operador",
+    "Description": "Notifica al operador cuando su merma es rechazada o se solicita corrección",
+    "Enabled": true,
+    "Event": {
+      "Source": "Data Change",
+      "TableName": "Registro_de_Mermas_y_Vencimientos",
+      "Condition": "OR(AND([_THISROW_AFTER].[Estado_Merma] = \"Rechazada\", [_THISROW_BEFORE].[Estado_Merma] <> \"Rechazada\"), AND([_THISROW_AFTER].[Estado_Merma] = \"Correccion_Solicitada\", [_THISROW_BEFORE].[Estado_Merma] <> \"Correccion_Solicitada\"))"
+    },
+    "Process": {
+      "Type": "Task",
+      "TaskName": "Task_Notificar_Operador_Merma_Rechazada"
+    }
+  },
+  {
+    "BotName": "Bot_Merma_Stock_Critico_Alerta_Admin",
+    "Description": "Si tras merma aprobada el stock queda < punto_reorden, alerta a Admin",
+    "Enabled": true,
+    "Event": {
+      "Source": "Data Change",
+      "TableName": "Registro_de_Mermas_y_Vencimientos",
+      "Condition": "AND([_THISROW_AFTER].[Estado_Merma] = \"Aprobada\", [_THISROW_AFTER].[Requiere_Compra_Urgente?] = TRUE, [_THISROW_BEFORE].[Requiere_Compra_Urgente?] <> TRUE)"
+    },
+    "Process": {
+      "Type": "Task",
+      "TaskName": "Task_Alerta_Stock_Critico_Admin"
+    }
+  },
+  {
+    "BotName": "Bot_Merma_Monto_Alto_Alerta_Admin",
+    "Description": "Si merma aprobada > umbral configurado (Config_Global), alerta a Admin",
+    "Enabled": true,
+    "Event": {
+      "Source": "Data Change",
+      "TableName": "Registro_de_Mermas_y_Vencimientos",
+      "Condition": "AND([_THISROW_AFTER].[Estado_Merma] = \"Aprobada\", [_THISROW_AFTER].[Costo_Total_Merma] > LOOKUP(\"UMBRAL_ALERTA_MERMA_COSTO\", \"Config_Global\", \"Clave\", \"Valor\"))"
+    },
+    "Process": {
+      "Type": "Task",
+      "TaskName": "Task_Alerta_Merma_Monto_Alto_Admin"
+    }
+  },
+  {
+    "BotName": "Bot_Merma_Vencida_Sin_Accion_Recordatorio",
+    "Description": "Cada 4h: merma en Pendiente > 4h sin acción → recordatorio a Encargado",
+    "Enabled": true,
+    "Event": {
+      "Source": "Schedule",
+      "Schedule": "Every 4 hours",
+      "TimeZone": "America/Mexico_City"
+    },
+    "Process": {
+      "Type": "Task",
+      "TaskName": "Task_Recordatorio_Merma_Pendiente_Vencida"
+    }
+  }
+]

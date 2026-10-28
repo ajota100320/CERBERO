@@ -1,0 +1,9 @@
+Plantilla_ID,Nombre,Descripcion,Sucursal_ID,Tipo_Frecuencia,Categoria_Filtro,Activa?,Fecha_Creacion,Creado_Por
+PLT_001,"Conteo Diario Apertura","Conteo rápido de ingredientes críticos al abrir","[Sucursal_ID_Suc1]","Diario","Criticos",TRUE,NOW(),USEREMAIL()
+PLT_002,"Conteo Diario Cierre","Conteo de ingredientes críticos al cerrar","[Sucursal_ID_Suc1]","Diario","Criticos",TRUE,NOW(),USEREMAIL()
+PLT_003,"Conteo Semanal Completo","Conteo de todos los ingredientes de la sucursal","[Sucursal_ID_Suc1]","Semanal","Todos",TRUE,NOW(),USEREMAIL()
+PLT_004,"Conteo Mensual Cierre Contable","Conteo exhaustivo para cierre contable mensual","[Sucursal_ID_Suc1]","Mensual","Todos",TRUE,NOW(),USEREMAIL()
+PLT_005,"Conteo Diario Apertura Suc 2","Conteo rápido de ingredientes críticos al abrir","[Sucursal_ID_Suc2]","Diario","Criticos",TRUE,NOW(),USEREMAIL()
+PLT_006,"Conteo Diario Cierre Suc 2","Conteo de ingredientes críticos al cerrar","[Sucursal_ID_Suc2]","Diario","Criticos",TRUE,NOW(),USEREMAIL()
+PLT_007,"Conteo Semanal Completo Suc 2","Conteo de todos los ingredientes de la sucursal","[Sucursal_ID_Suc2]","Semanal","Todos",TRUE,NOW(),USEREMAIL()
+PLT_008,"Conteo Mensual Cierre Contable Suc 2","Conteo exhaustivo para cierre contable mensual","[Sucursal_ID_Suc2]","Mensual","Todos",TRUE,NOW(),USEREMAIL()

@@ -1,0 +1,5 @@
+Tabla_ID,Nombre_Tabla,Descripcion,Es_Nueva?,Key_Column,Ref_Tablas,Fase
+Plantillas_Inventario,Plantillas_Inventario,"Catálogo de plantillas de conteo por sucursal/tipo (diario, semanal, mensual, cierre)",TRUE,Plantilla_ID,"Sucursales, Categorias, Unidades",3
+Conteos_Inventario,Conteos_Inventario,"Cabecera de cada conteo físico: quién, cuándo, qué plantilla, estado",TRUE,Conteo_ID,"Sucursales, Usuarios, Plantillas_Inventario, Usuarios_Sucursales",3
+Items_Conteo,Items_Conteo,"Detalle línea por línea: ingrediente, teórico, contado, diferencia, tolerancia",TRUE,Item_ID,"Conteos_Inventario, Ingredientes_y_Stock, Categorias, Unidades",3
+Ajustes_Inventario,Ajustes_Inventario,"Registro de ajustes aprobados tras conteo (genera merma automática si diff > tolerancia)",TRUE,Ajuste_ID,"Conteos_Inventario, Items_Conteo, Ingredientes_y_Stock, Usuarios",3

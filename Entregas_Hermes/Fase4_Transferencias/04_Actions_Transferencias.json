@@ -1,0 +1,261 @@
+[
+  {
+    "ActionName": "Transferencia_Crear_Solicitud",
+    "Type": "App: go to a view within this app",
+    "Description": "Abre formulario para crear nueva orden de transferencia (Encargado origen)",
+    "TableName": "Sucursales",
+    "Icon": "swap-horizontal",
+    "ShowIf": "OR(USERROLE(\"Administrador\"), AND(USERROLE(\"Encargado\"), [Sucursal_ID] = LOOKUP(USEREMAIL(), \"Usuarios_Sucursales\", \"Email\", \"Sucursal_ID\")))",
+    "TargetView": "View_Transferencia_Formulario_Nueva"
+  },
+  {
+    "ActionName": "Transferencia_Solicitar",
+    "Type": "Data: set column values",
+    "Description": "Cambia estado a 'Solicitada', setea Solicitada_Por, Fecha_Solicitud",
+    "TableName": "Ordenes_Transferencia",
+    "ShowIf": "AND([Estado] = \"Borrador\", OR(USERROLE(\"Administrador\"), AND(USERROLE(\"Encargado\"), [Sucursal_Origen_ID] = LOOKUP(USEREMAIL(), \"Usuarios_Sucursales\", \"Email\", \"Sucursal_ID\"))))",
+    "Columns": [
+      "Estado",
+      "Solicitada_Por",
+      "Fecha_Solicitud",
+      "Sync_Pending?"
+    ],
+    "Values": [
+      "\"Solicitada\"",
+      "USEREMAIL()",
+      "NOW()",
+      "TRUE"
+    ]
+  },
+  {
+    "ActionName": "Transferencia_Agregar_Item",
+    "Type": "Data: add a new row to a table",
+    "Description": "Agrega ingrediente a la orden de transferencia",
+    "TableName": "Items_Transferencia",
+    "ShowIf": "AND(IN([Orden_ID].[Estado], LIST(\"Borrador\", \"Solicitada\")), OR(USERROLE(\"Administrador\"), AND(USERROLE(\"Encargado\"), [Orden_ID].[Sucursal_Origen_ID] = LOOKUP(USEREMAIL(), \"Usuarios_Sucursales\", \"Email\", \"Sucursal_ID\"))))",
+    "InitialValues": {
+      "Orden_ID": "[_THISROW].[Orden_ID]",
+      "Ingrediente_ID": "",
+      "Cantidad_Solicitada": 1,
+      "Unidad_Medida": "[_THISROW].[Ingrediente_ID].[Unidad_Base]",
+      "Estado_Item": "\"Pendiente\"",
+      "Sync_Pending?": "TRUE"
+    }
+  },
+  {
+    "ActionName": "Transferencia_Aprobar_Origen",
+    "Type": "Data: set column values",
+    "Description": "Encargado origen aprueba salida → Estado = Aprobada_Origen",
+    "TableName": "Ordenes_Transferencia",
+    "ShowIf": "AND([Estado] = \"Solicitada\", OR(USERROLE(\"Administrador\"), AND(USERROLE(\"Encargado\"), [Sucursal_Origen_ID] = LOOKUP(USEREMAIL(), \"Usuarios_Sucursales\", \"Email\", \"Sucursal_ID\"))))",
+    "Columns": [
+      "Estado",
+      "Aprobada_Origen_Por",
+      "Fecha_Aprobacion_Origen",
+      "Sync_Pending?"
+    ],
+    "Values": [
+      "\"Aprobada_Origen\"",
+      "USEREMAIL()",
+      "NOW()",
+      "TRUE"
+    ]
+  },
+  {
+    "ActionName": "Transferencia_Aprobar_Destino",
+    "Type": "Data: set column values",
+    "Description": "Encargado destino aprueba entrada → Estado = Aprobada_Destino",
+    "TableName": "Ordenes_Transferencia",
+    "ShowIf": "AND([Estado] = \"Aprobada_Origen\", OR(USERROLE(\"Administrador\"), AND(USERROLE(\"Encargado\"), [Sucursal_Destino_ID] = LOOKUP(USEREMAIL(), \"Usuarios_Sucursales\", \"Email\", \"Sucursal_ID\"))))",
+    "Columns": [
+      "Estado",
+      "Aprobada_Destino_Por",
+      "Fecha_Aprobacion_Destino",
+      "Sync_Pending?"
+    ],
+    "Values": [
+      "\"Aprobada_Destino\"",
+      "USEREMAIL()",
+      "NOW()",
+      "TRUE"
+    ]
+  },
+  {
+    "ActionName": "Transferencia_Iniciar_Preparacion",
+    "Type": "Data: set column values",
+    "Description": "Operador origen inicia preparación → Estado = En_Preparacion",
+    "TableName": "Ordenes_Transferencia",
+    "ShowIf": "AND([Estado] = \"Aprobada_Destino\", OR(USERROLE(\"Administrador\"), AND(USERROLE(\"Encargado\"), [Sucursal_Origen_ID] = LOOKUP(USEREMAIL(), \"Usuarios_Sucursales\", \"Email\", \"Sucursal_ID\"))))",
+    "Columns": [
+      "Estado",
+      "Preparada_Por",
+      "Fecha_Preparacion",
+      "Sync_Pending?"
+    ],
+    "Values": [
+      "\"En_Preparacion\"",
+      "USEREMAIL()",
+      "NOW()",
+      "TRUE"
+    ]
+  },
+  {
+    "ActionName": "Item_Preparar",
+    "Type": "Data: set column values",
+    "Description": "Operador registra cantidad preparada para un item",
+    "TableName": "Items_Transferencia",
+    "ShowIf": "AND([Orden_ID].[Estado] = \"En_Preparacion\", OR(USERROLE(\"Operador\"), USERROLE(\"Encargado\"), USERROLE(\"Administrador\")))",
+    "Columns": [
+      "Cantidad_Preparada",
+      "Observacion_Preparador",
+      "Estado_Item",
+      "Sync_Pending?"
+    ],
+    "Values": [
+      "",
+      "",
+      "\"Preparado\"",
+      "TRUE"
+    ]
+  },
+  {
+    "ActionName": "Transferencia_Despachar",
+    "Type": "Data: set column values",
+    "Description": "Encargado origen despacha → Estado = Despachada, descuenta stock origen",
+    "TableName": "Ordenes_Transferencia",
+    "ShowIf": "AND([Estado] = \"En_Preparacion\", OR(USERROLE(\"Administrador\"), AND(USERROLE(\"Encargado\"), [Sucursal_Origen_ID] = LOOKUP(USEREMAIL(), \"Usuarios_Sucursales\", \"Email\", \"Sucursal_ID\"))))",
+    "Columns": [
+      "Estado",
+      "Despachada_Por",
+      "Fecha_Despacho",
+      "Sync_Pending?"
+    ],
+    "Values": [
+      "\"Despachada\"",
+      "USEREMAIL()",
+      "NOW()",
+      "TRUE"
+    ],
+    "ReferencedAction": "Action_Descontar_Stock_Transferencia_Origen"
+  },
+  {
+    "ActionName": "Action_Descontar_Stock_Transferencia_Origen",
+    "Type": "Data: execute an action on a set of rows",
+    "Description": "Descuenta Cantidad_Despachada del stock en sucursal origen",
+    "TableName": "Ingredientes_y_Stock",
+    "RowSelection": {
+      "Type": "Expression",
+      "Expression": "FILTER(\"Ingredientes_y_Stock\", AND([Ingrediente_ID] IN SELECT(Items_Transferencia[Ingrediente_ID], [Orden_ID] = [_THISROW].[Orden_ID]), [Sucursal_ID] = [_THISROW].[Sucursal_Origen_ID]))"
+    },
+    "ReferencedAction": "Action_Descontar_Stock_Ingrediente",
+    "RunAsJob": true
+  },
+  {
+    "ActionName": "Transferencia_Marcar_En_Transito",
+    "Type": "Data: set column values",
+    "Description": "Cambia estado a En_Transito (automático al despachar o manual)",
+    "TableName": "Ordenes_Transferencia",
+    "ShowIf": "AND([Estado] = \"Despachada\", USERROLE(\"Administrador\"))",
+    "Columns": [
+      "Estado",
+      "Sync_Pending?"
+    ],
+    "Values": [
+      "\"En_Transito\"",
+      "TRUE"
+    ]
+  },
+  {
+    "ActionName": "Recepcion_Registrar",
+    "Type": "Data: add a new row to a table",
+    "Description": "Operador destino registra recepción física de un item",
+    "TableName": "Recepciones_Transferencia",
+    "ShowIf": "AND(IN([Orden_ID].[Estado], LIST(\"Despachada\", \"En_Transito\")), OR(USERROLE(\"Operador\"), USERROLE(\"Encargado\"), USERROLE(\"Administrador\"), [Orden_ID].[Sucursal_Destino_ID] = LOOKUP(USEREMAIL(), \"Usuarios_Sucursales\", \"Email\", \"Sucursal_ID\")))",
+    "InitialValues": {
+      "Orden_ID": "[_THISROW].[Orden_ID]",
+      "Item_ID": "[_THISROW].[Item_ID]",
+      "Ingrediente_ID": "[_THISROW].[Ingrediente_ID]",
+      "Cantidad_Recibida": "[_THISROW].[Item_ID].[Cantidad_Despachada]",
+      "Cantidad_Esperada": "[_THISROW].[Item_ID].[Cantidad_Despachada]",
+      "Estado_Recepcion": "IF([_THISROW].[Cantidad_Recibida] = [_THISROW].[Item_ID].[Cantidad_Despachada], \"Completa\", \"Con_Diferencias\")",
+      "Recibida_Por": "USEREMAIL()",
+      "Fecha_Recepcion": "NOW()",
+      "Observaciones": "",
+      "Sync_Pending?": "TRUE"
+    }
+  },
+  {
+    "ActionName": "Transferencia_Completar_Recepcion",
+    "Type": "Data: set column values",
+    "Description": "Encargado destino finaliza recepción → Estado final + aplica stock destino",
+    "TableName": "Ordenes_Transferencia",
+    "ShowIf": "AND(IN([Estado], LIST(\"Despachada\", \"En_Transito\")), OR(USERROLE(\"Administrador\"), AND(USERROLE(\"Encargado\"), [Sucursal_Destino_ID] = LOOKUP(USEREMAIL(), \"Usuarios_Sucursales\", \"Email\", \"Sucursal_ID\"))))",
+    "Columns": [
+      "Estado",
+      "Recibida_Por",
+      "Fecha_Recepcion",
+      "Sync_Pending?"
+    ],
+    "Values": [
+      "IF(COUNT(FILTER(\"Recepciones_Transferencia\", AND([Orden_ID] = [_THISROW].[Orden_ID], [Estado_Recepcion] = \"Con_Diferencias\"))) > 0, \"Recibida_Con_Diferencias\", \"Recibida_Completa\")",
+      "USEREMAIL()",
+      "NOW()",
+      "TRUE"
+    ],
+    "ReferencedAction": "Action_Aplicar_Stock_Transferencia_Destino"
+  },
+  {
+    "ActionName": "Action_Aplicar_Stock_Transferencia_Destino",
+    "Type": "Data: execute an action on a set of rows",
+    "Description": "Suma Cantidad_Recibida al stock en sucursal destino",
+    "TableName": "Ingredientes_y_Stock",
+    "RowSelection": {
+      "Type": "Expression",
+      "Expression": "FILTER(\"Ingredientes_y_Stock\", AND([Ingrediente_ID] IN SELECT(Items_Transferencia[Ingrediente_ID], [Orden_ID] = [_THISROW].[Orden_ID]), [Sucursal_ID] = [_THISROW].[Sucursal_Destino_ID]))"
+    },
+    "ReferencedAction": "Action_Sumar_Stock_Ingrediente",
+    "RunAsJob": true
+  },
+  {
+    "ActionName": "Action_Sumar_Stock_Ingrediente",
+    "Type": "Data: set column values",
+    "Description": "Actualiza Stock_Actual = Stock_Actual + Cantidad_Recibida",
+    "TableName": "Ingredientes_y_Stock",
+    "Columns": [
+      "Stock_Actual",
+      "Updated_At",
+      "Updated_By",
+      "Sync_Pending?"
+    ],
+    "Values": [
+      "[_THISROW].[Stock_Actual] + LOOKUP([_THISROW].[Ingrediente_ID], \"Items_Transferencia\", \"Ingrediente_ID\", \"Cantidad_Recibida\")",
+      "NOW()",
+      "USEREMAIL()",
+      "TRUE"
+    ]
+  },
+  {
+    "ActionName": "Transferencia_Cancelar",
+    "Type": "Data: set column values",
+    "Description": "Cancela transferencia (solo si no despachada)",
+    "TableName": "Ordenes_Transferencia",
+    "ShowIf": "AND(IN([Estado], LIST(\"Borrador\", \"Solicitada\", \"Aprobada_Origen\", \"Aprobada_Destino\", \"En_Preparacion\")), OR(USERROLE(\"Administrador\"), AND(USERROLE(\"Encargado\"), OR([Sucursal_Origen_ID] = LOOKUP(USEREMAIL(), \"Usuarios_Sucursales\", \"Email\", \"Sucursal_ID\"), [Sucursal_Destino_ID] = LOOKUP(USEREMAIL(), \"Usuarios_Sucursales\", \"Email\", \"Sucursal_ID\"))))))",
+    "Columns": [
+      "Estado",
+      "Sync_Pending?"
+    ],
+    "Values": [
+      "\"Cancelada\"",
+      "TRUE"
+    ]
+  },
+  {
+    "ActionName": "Transferencia_Generar_Ajuste_Diferencias",
+    "Type": "Data: execute an action on a set of rows",
+    "Description": "Si recepción con diferencias, genera Ajustes_Inventario (Fase 3) en destino",
+    "TableName": "Ordenes_Transferencia",
+    "ShowIf": "AND([Estado] = \"Recibida_Con_Diferencias\", USERROLE(\"Administrador\"))",
+    "ReferencedAction": "Action_Generar_Ajustes_Desde_Transferencia",
+    "RunAsJob": true
+  }
+]

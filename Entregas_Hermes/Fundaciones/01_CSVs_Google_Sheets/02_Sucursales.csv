@@ -1,0 +1,3 @@
+Sucursal_ID,Nombre,Codigo,Direccion,Telefono,Encargado_Email,Horario_Apertura,Horario_Cierre,Zona_Horaria,Activa?,Fecha_Creacion,Creado_Por
+UNIQUEID(),"Sucursal 1","SUC001",,,,,"08:00","23:00","America/Mexico_City",TRUE,NOW(),USEREMAIL()
+UNIQUEID(),"Sucursal 2","SUC002",,,,,"08:00","23:00","America/Mexico_City",TRUE,NOW(),USEREMAIL()

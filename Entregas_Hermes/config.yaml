@@ -1,0 +1,119 @@
+# =============================================================================
+# CONFIGURACIÓN MASTER DEPLOYMENT - ERP APP SHEET TEMPLO DEL SMASH
+# =============================================================================
+# Copia este archivo a config.yaml y rellena tus valores reales
+# NUNCA commitees credenciales reales al repo
+
+# --- GOOGLE CLOUD / APP SHEET ---
+google_cloud:
+  project_id: "erp-smash-gotera"
+  region: "us-central1"
+  
+  # Service Account con roles:
+  # - AppSheet Admin (custom role o Owner en AppSheet)
+  # - Sheets Editor (roles/spreadsheets.editor)
+  # - Drive Editor (roles/drive.file)
+  service_account_path: ""
+
+# --- APP SHEET APP ---
+appsheet:
+  # App ID de tu app en AppSheet (se obtiene en Manage > App Info)
+  app_id: "Base_Datos_ERP_Gastronomico_MVP-686799133"
+  
+  # AppSheet API Key (si usas REST API directa)
+  # O usa OAuth del Service Account
+  api_key: "V2-XEPRX-Mjjav-OWHE8-3HHAd-znUa9-9YhWM-bOYay-YfIEq"
+
+# --- GOOGLE SHEETS (BACKEND DATA) ---
+sheets:
+  # Spreadsheet ID de ERP_Fundaciones_Data (el ID largo de la URL)
+  # https://docs.google.com/spreadsheets/d/SPREADSHEET_ID/edit
+  spreadsheet_id: "1h03aFD9REpN_zkaqnJkFqvw_HqLGXm0a5PirIOtjsyk"
+  
+  # Hoja de configuración global (ya existente en Fase 1)
+  config_sheet_name: "Config_Global"
+  
+  # Carpeta Drive donde están los archivos (opcional)
+  drive_folder_id: ""
+
+# --- USUARIOS DE PRUEBA (para validación automatizada) ---
+test_users:
+  admin:
+    email: "ajota1003@gmail.com"
+    password_env: "123456789"
+  encargado_suc1:
+    email: "encargado1@tudominio.com"
+    password_env: "TEST_ENC1_PASSWORD"
+  encargado_suc2:
+    email: "encargado2@tudominio.com"
+    password_env: "TEST_ENC2_PASSWORD"
+  operador_suc1_a:
+    email: "operador1a@tudominio.com"
+    password_env: "TEST_OP1A_PASSWORD"
+  operador_suc1_b:
+    email: "operador1b@tudominio.com"
+    password_env: "TEST_OP1B_PASSWORD"
+  operador_suc2_a:
+    email: "operador2a@tudominio.com"
+    password_env: "TEST_OP2A_PASSWORD"
+
+# --- ENTORNOS ---
+environments:
+  staging:
+    app_name_suffix: " (STAGING)"
+    deploy_target: "STAGING"
+    test_users: ["admin", "encargado_suc1", "operador_suc1_a"]
+  production:
+    app_name_suffix: ""
+    deploy_target: "PRODUCTION"
+    test_users: ["admin", "encargado_suc1", "encargado_suc2", "operador_suc1_a", "operador_suc1_b", "operador_suc2_a"]
+
+# --- UMBRALES Y CONFIGURACIÓN DE NEGOCIO (se escriben a Config_Global) ---
+business_config:
+  # Fase 2 - Mermas
+  UMBRAL_MERMA_CRITICA_PORCENTAJE: 10
+  UMBRAL_MERMA_ALERTA_PORCENTAJE: 5
+  DIAS_ALERTA_VENCIMIENTO: 3
+  
+  # Fase 3 - Inventario
+  UMBRAL_DIFERENCIA_INVENTARIO_PORCENTAJE: 5
+  UMBRAL_DIFERENCIA_INVENTARIO_CRITICA: 15
+  TOLERANCIA_CONTEO_POR_DEFECTO: 2
+  
+  # Fase 4 - Transferencias
+  UMBRAL_DIFERENCIA_TRANSFERENCIA_CRITICA: 5
+  HORAS_ALERTA_TRANSFERENCIA_ESTANCADA: 24
+  
+  # Fase 5 - Costos
+  UMBRAL_VARIACION_COSTO_CRITICA: 10
+  UMBRAL_MERMA_REAL_ALERTA: 15
+  HORAS_ALERTA_PRODUCCION_ESTANCADA: 24
+  RECALCULAR_COSTOS_RECETAS_AUTO: true
+  
+  # Fase 6 - Tareas/KPIs/Incidencias
+  UMBRAL_VARIACION_COSTO_CRITICA: 10
+  HORAS_ALERTA_PRODUCCION_ESTANCADA: 24
+
+# --- NOTIFICACIONES ---
+notifications:
+  # Webhook para alertas críticas (Slack, Teams, Discord, etc.)
+  critical_webhook_url: ""
+  # Email para reportes diarios
+  daily_report_emails: []
+  
+# --- DESPLIEGUE ---
+deployment:
+  # Pausa entre fases (segundos) para rate limiting API
+  phase_delay_seconds: 30
+  # Reintentos en fallos de API
+  max_retries: 3
+  retry_delay_seconds: 10
+  # Timeout por operación API
+  api_timeout_seconds: 60
+
+# --- LOGGING ---
+logging:
+  level: "INFO"
+  file: "logs/deployment.log"
+  max_size_mb: 10
+  backup_count: 5

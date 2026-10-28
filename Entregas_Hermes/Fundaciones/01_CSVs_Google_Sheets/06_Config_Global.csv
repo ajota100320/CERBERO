@@ -1,0 +1,13 @@
+Config_ID,Clave,Valor,Tipo,Descripcion,Editable_Por_Rol,Fecha_Actualizacion,Actualizado_Por
+CFG_001,APP_VERSION,"1.0.0",Text,"Versión actual del ERP","Administrador",NOW(),USEREMAIL()
+CFG_002,TOLERANCIA_INVENTARIO_DEFAULT,"5",Number,"Tolerancia % default para conteos físicos","Administrador",NOW(),USEREMAIL()
+CFG_003,DIAS_HISTORIAL_OFFLINE,"30",Number,"Días de datos a cachear offline","Administrador",NOW(),USEREMAIL()
+CFG_004,NOTIF_PUSH_HABILITADO,"TRUE",Yes/No,"Notificaciones push nativas activas","Administrador",NOW(),USEREMAIL()
+CFG_005,NOTIF_CALENDAR_HABILITADO,"FALSE",Yes/No,"Integración Google Calendar","Administrador",NOW(),USEREMAIL()
+CFG_006,NOTIF_TELEGRAM_HABILITADO,"FALSE",Yes/No,"Integración Telegram (webhook)","Administrador",NOW(),USEREMAIL()
+CFG_007,AUTO_SYNC_INTERVAL_MIN,"30",Number,"Intervalo auto-sync en minutos","Administrador",NOW(),USEREMAIL()
+CFG_008,REQUIERE_FIRMA_CIERRE_TURNO,"TRUE",Yes/No,"Firma obligatoria en cierre de turno","Administrador",NOW(),USEREMAIL()
+CFG_009,MAX_HORAS_EXTRA_DIA,"3",Number,"Máximo horas extra por día por trabajador","Administrador",NOW(),USEREMAIL()
+CFG_010,ESTADO_MERMA_FLUJO,"[""Borrador"",""Pendiente"",""En_Revision"",""Aprobada"",""Rechazada"",""Correccion_Solicitada"",""Anulada""]",JSON,"Estados válidos para flujo de mermas","Administrador",NOW(),USEREMAIL()
+CFG_011,ESTADO_TRANSFERENCIA_FLUJO,"[""Borrador"",""Solicitada"",""Aprobada"",""En_Preparacion"",""Despachada"",""Recibida_Con_Diferencias"",""Recibida_Completa"",""Cancelada""]",JSON,"Estados válidos para transferencias","Administrador",NOW(),USEREMAIL()
+CFG_012,ESTADO_CONTEO_FLUJO,"[""Pendiente"",""En_Progreso"",""Completado"",""Aprobado"",""Con_Diferencias""]",JSON,"Estados válidos para conteos","Administrador",NOW(),USEREMAIL()

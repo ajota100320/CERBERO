@@ -1,0 +1,7 @@
+Prog_ID,Tarea_ID,Sucursal_ID,Frecuencia,Dias_Semana,Hora_Programada,Hora_Ventana_Fin,Responsable_Rol,Responsable_Usuario_Especifico,Es_Activa,Aplica_Festivos,Notificar_Antes_Min,Fecha_Creacion,Creado_Por,Sync_Pending?
+PROG_001,TAR_001,[Sucursal_ID_Suc1],"Diaria","1,2,3,4,5,6,7","07:00","07:30","Operador",,TRUE,FALSE,15,NOW(),USEREMAIL(),TRUE
+PROG_002,TAR_002,[Sucursal_ID_Suc1],"Diaria","1,2,3,4,5,6,7","23:00","23:45","Operador",,TRUE,FALSE,15,NOW(),USEREMAIL(),TRUE
+PROG_003,TAR_003,[Sucursal_ID_Suc1],"Semanal","1","09:00","11:00","Encargado",,TRUE,TRUE,30,NOW(),USEREMAIL(),TRUE
+PROG_004,TAR_004,[Sucursal_ID_Suc1],"Diaria","1,2,3,4,5,6,7","07:30","08:30","Operador",,TRUE,FALSE,15,NOW(),USEREMAIL(),TRUE
+PROG_005,TAR_005,[Sucursal_ID_Suc1],"Diaria","1,2,3,4,5,6,7","07:15","07:30","Encargado",,TRUE,FALSE,10,NOW(),USEREMAIL(),TRUE
+PROG_006,TAR_006,[Sucursal_ID_Suc1],"Semanal","2","10:00","11:00","Encargado",,TRUE,TRUE,30,NOW(),USEREMAIL(),TRUE

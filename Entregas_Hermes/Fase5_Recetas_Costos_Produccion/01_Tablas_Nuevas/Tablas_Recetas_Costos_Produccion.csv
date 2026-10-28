@@ -1,0 +1,6 @@
+Tabla_ID,Nombre_Tabla,Descripcion,Es_Nueva?,Key_Column,Ref_Tablas,Fase
+Recetas,Recetas,"Catálogo de recetas: ingredientes, porciones, costos, versión, estado aprobación",TRUE,Receta_ID,"Ingredientes_y_Stock, Categorias, Unidades, Usuarios",5
+Receta_Ingredientes,Receta_Ingredientes,"Detalle BOM: ingrediente, cantidad, unidad, merma %, costo por porción",TRUE,Receta_Ing_ID,"Recetas, Ingredientes_y_Stock, Unidades",5
+Produccion,Produccion,"Registro de producción ejecutada: receta, cantidad, lote, fecha, responsable",TRUE,Produccion_ID,"Recetas, Sucursales, Usuarios, Usuarios_Sucursales",5
+Produccion_Detalle,Produccion_Detalle,"Consumo real vs teórico por ingrediente en una producción",TRUE,Prod_Det_ID,"Produccion, Ingredientes_y_Stock, Receta_Ingredientes",5
+Costos_Historicos,Costos_Historicos,"Historial de costos por ingrediente/receta para análisis de varianza",TRUE,Costo_ID,"Ingredientes_y_Stock, Recetas, Usuarios",5

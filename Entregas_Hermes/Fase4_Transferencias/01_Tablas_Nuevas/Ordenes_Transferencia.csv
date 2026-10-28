@@ -1,0 +1,3 @@
+Orden_ID,Estado,Sucursal_Origen_ID,Sucursal_Destino_ID,Solicitada_Por,Fecha_Solicitud,Aprobada_Origen_Por,Fecha_Aprobacion_Origen,Aprobada_Destino_Por,Fecha_Aprobacion_Destino,Preparada_Por,Fecha_Preparacion,Despachada_Por,Fecha_Despacho,Recibida_Por,Fecha_Recepcion,Observaciones,Fecha_Creacion,Creado_Por,Sync_Pending?
+ORD_001,Solicitada,[Sucursal_ID_Suc1],[Sucursal_ID_Suc2],"encargado1@test.com",NOW(),,,,,,,,,,NOW(),USEREMAIL(),TRUE
+ORD_002,Borrador,[Sucursal_ID_Suc2],[Sucursal_ID_Suc1],"encargado2@test.com",NOW(),,,,,,,,,,,NOW(),USEREMAIL(),TRUE

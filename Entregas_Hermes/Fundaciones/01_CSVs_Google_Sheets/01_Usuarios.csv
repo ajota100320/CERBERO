@@ -1,0 +1,2 @@
+ID,Email,Nombre_Completo,Rol_Principal,Activo?,Fecha_Creacion,Creado_Por,Sucursal_Default_ID,Telefono,Notas
+UNIQUEID(),,,"Operador",TRUE,NOW(),USEREMAIL(),,,,

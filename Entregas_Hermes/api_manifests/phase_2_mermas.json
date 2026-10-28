@@ -1,0 +1,57 @@
+{
+  "phase": 2,
+  "name": "Mermas 2.0",
+  "description": "Flujo completo de mermas: Borrador → Pendiente → Aprobada/Rechazada, Stock automático, Notificaciones, Vistas por rol",
+  "dependencies": [1],
+  "estimated_time_minutes": 90,
+  "manifest": {
+    "tables_extend": [
+      {
+        "table_name": "Registro_de_Mermas_y_Vencimientos",
+        "audit_columns_file": "Fase2_Mermas_2.0/03_Columnas_Auditoria_Por_Tabla/Columnas_Mermas_Extendidas.csv",
+        "new_columns": [
+          {"name": "Estado_Merma", "type": "Enum", "values": ["Borrador", "Pendiente", "Aprobada", "Rechazada"], "initial": "Borrador"},
+          {"name": "Tipo_Merma", "type": "Enum", "values": ["Vencimiento", "Rotura", "Merma_Cocina", "Merma_Cliente", "Otro"], "required": true},
+          {"name": "Motivo_Rechazo", "type": "LongText", "show_if": "[Estado_Merma] = \"Rechazada\""},
+          {"name": "Aprobada_Por", "type": "Text", "editable": false},
+          {"name": "Fecha_Aprobacion", "type": "DateTime", "editable": false},
+          {"name": "Costo_Total", "type": "Price", "app_formula": "[Cantidad] * [Costo_Unitario]", "editable": false},
+          {"name": "Es_Critica", "type": "Yes/No", "app_formula": "OR([Tipo_Merma] = \"Vencimiento\", [Costo_Total] > 50)", "editable": false},
+          {"name": "Notificada_Encargado", "type": "Yes/No", "initial": "FALSE", "editable": false},
+          {"name": "Sync_Pending?", "type": "Yes/No", "initial": "TRUE", "editable": false}
+        ],
+        "security_filter": "OR(USERROLE(\"Administrador\"), IN([Sucursal_ID], SELECT(Usuarios_Sucursales[Sucursal_ID], [Email] = USEREMAIL())))"
+      }
+    ],
+    "actions": [
+      {"file": "Fase2_Mermas_2.0/02_Actions_Mermas_Flujo.json", "count": 8}
+    ],
+    "bots": [
+      {"file": "Fase2_Mermas_2.0/03_Bots_Mermas.json", "count": 4}
+    ],
+    "tasks": [
+      {"file": "Fase2_Mermas_2.0/04_Tasks_Bots_Mermas.json", "count": 6}
+    ],
+    "views": [
+      {"file": "Fase2_Mermas_2.0/05_Views_Mermas.json", "count": 6}
+    ],
+    "config_global_updates": [
+      {"Config_ID": "CFG_007", "Clave": "UMBRAL_MERMA_CRITICA_PORCENTAJE", "Valor": "10", "Tipo": "Number"},
+      {"Config_ID": "CFG_008", "Clave": "UMBRAL_MERMA_ALERTA_PORCENTAJE", "Valor": "5", "Tipo": "Number"},
+      {"Config_ID": "CFG_009", "Clave": "DIAS_ALERTA_VENCIMIENTO", "Valor": "3", "Tipo": "Number"}
+    ],
+    "deployment_steps": [
+      "extend_merma_table_columns",
+      "apply_audit_columns",
+      "create_actions",
+      "import_bots",
+      "import_tasks",
+      "import_views",
+      "update_config_global",
+      "regenerate_structure",
+      "deploy_staging",
+      "run_validation_tests"
+    ],
+    "validation_tests": 18
+  }
+}

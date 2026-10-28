@@ -1,0 +1,115 @@
+Tabla_Objetivo,Nombre_Columna,Tipo_Dato,Es_Key?,Es_Ref?,Ref_Table,Initial_Value,App_Formula,Show_If,Valid_If,Descripcion,Editable_En_Formulario?,Orden,Fase
+Recetas,Receta_ID,Text,TRUE,FALSE,,UNIQUEID(),,,FALSE,"Clave única receta",FALSE,1,5
+Recetas,Nombre,Text,FALSE,FALSE,,,,,"LEN([_THIS]) >= 3","Nombre visible",TRUE,2,5
+Recetas,Categoria,Enum,FALSE,FALSE,,Principales,,,"IN([_THIS], LIST(\"Principales\", \"Guarniciones\", \"Salsas\", \"Postres\", \"Bebidas\", \"Otros\"))","Categoría menú",TRUE,3,5
+Recetas,Descripcion,LongText,FALSE,FALSE,,,,,"Descripción preparación",TRUE,4,5
+Recetas,Rendimiento_Porciones,Number,FALSE,FALSE,,,,,">0","Cuántas porciones rinde",TRUE,5,5
+Recetas,Unidad_Rendimiento,Enum,FALSE,FALSE,,Porciones,,,"IN([_THIS], LIST(\"Porciones\", \"Kg\", \"Litros\", \"Unidades\"))","Unidad del rendimiento",TRUE,6,5
+Recetas,Tiempo_Preparacion_Min,Number,FALSE,FALSE,,,,,">=0","Minutos preparación",TRUE,7,5
+Recetas,Tiempo_Coccion_Min,Number,FALSE,FALSE,,,,,">=0","Minutos cocción",TRUE,8,5
+Recetas,Dificultad,Enum,FALSE,FALSE,,Media,,,"IN([_THIS], LIST(\"Baja\", \"Media\", \"Alta\"))","Nivel dificultad",TRUE,9,5
+Recetas,Version,Number,FALSE,FALSE,,1,,,">=1","Versión receta (incrementa en cambios)",FALSE,10,5
+Recetas,Estado,Enum,FALSE,FALSE,,Borrador,,,"IN([_THIS], LIST(\"Borrador\", \"En_Revision\", \"Aprobada\", \"Obsoleta\"))","Estado aprobación",FALSE,11,5
+Recetas,Aprobada_Por,Text,FALSE,FALSE,,,,,FALSE,"Email quien aprobó",FALSE,12,5
+Recetas,Fecha_Aprobacion,DateTime,FALSE,FALSE,,,,,FALSE,"Cuándo aprobó",FALSE,13,5
+Recetas,Costo_Total_Receta,Price,FALSE,FALSE,,,[Receta_Total_Costo],FALSE,,">=0","Costo total receta (auto-calculado)",FALSE,14,5
+Recetas,Costo_Por_Porciona,Price,FALSE,FALSE,,,[Costo_Total_Receta] / [Rendimiento_Porciones],FALSE,,">=0","Costo por porción",FALSE,15,5
+Recetas,Es_Activa,Yes/No,FALSE,FALSE,,TRUE,,,,"Receta disponible para producción",TRUE,16,5
+Recetas,Sucursal_ID,Ref,FALSE,TRUE,Sucursales,LOOKUP(USEREMAIL(), "Usuarios_Sucursales", "Email", "Sucursal_ID"),FALSE,"IN([_THIS], SELECT(Sucursales[Sucursal_ID], [Activa?]=TRUE))","Sucursal propietaria",FALSE,17,5
+Recetas,Fecha_Creacion,DateTime,FALSE,FALSE,,NOW(),,,FALSE,"Auditoría",FALSE,18,5
+Recetas,Creado_Por,Text,FALSE,FALSE,,USEREMAIL(),,,FALSE,"Auditoría",FALSE,19,5
+Recetas,ID,Text,TRUE,FALSE,,UNIQUEID(),,,FALSE,"Key alias",FALSE,20,5
+Recetas,Created_At,DateTime,FALSE,FALSE,,NOW(),,,FALSE,"Auditoría estándar",FALSE,21,5
+Recetas,Created_By,Text,FALSE,FALSE,,USEREMAIL(),,,FALSE,"Auditoría estándar",FALSE,22,5
+Recetas,Updated_At,DateTime,FALSE,FALSE,,,NOW(),,FALSE,"Auditoría estándar",FALSE,23,5
+Recetas,Updated_By,Text,FALSE,FALSE,,,USEREMAIL(),,FALSE,"Auditoría estándar",FALSE,24,5
+Recetas,Deleted?,Yes/No,FALSE,FALSE,,FALSE,,,FALSE,"Soft delete",FALSE,25,5
+Recetas,Sync_Pending?,Yes/No,FALSE,FALSE,,TRUE,,,FALSE,"Sync offline",FALSE,26,5
+Receta_Ingredientes,Receta_Ing_ID,Text,TRUE,FALSE,,UNIQUEID(),,,FALSE,"Clave única línea BOM",FALSE,1,5
+Receta_Ingredientes,Receta_ID,Ref,FALSE,TRUE,Recetas,,,,,"Receta padre",FALSE,2,5
+Receta_Ingredientes,Ingrediente_ID,Ref,FALSE,TRUE,Ingredientes_y_Stock,,,,,"Ingrediente en receta",TRUE,3,5
+Receta_Ingredientes,Cantidad,Decimal,FALSE,FALSE,,,,,">0","Cantidad por receta (unidad base)",TRUE,4,5
+Receta_Ingredientes,Unidad_Medida,Text,FALSE,FALSE,,LOOKUP([Ingrediente_ID], "Ingredientes_y_Stock", "Ingrediente_ID", "Unidad_Base"),FALSE,,"Unidad (auto desde ingrediente)",FALSE,5,5
+Receta_Ingredientes,Merma_Porcentaje,Decimal,FALSE,FALSE,,0,,,">=0","% merma esperada en preparación",TRUE,6,5
+Receta_Ingredientes,Costo_Unitario_Snapshot,Price,FALSE,FALSE,,LOOKUP([Ingrediente_ID], "Ingredientes_y_Stock", "Ingrediente_ID", "Costo_Actual"),FALSE,,">=0","Costo unitario al crear línea (snapshot)",FALSE,7,5
+Receta_Ingredientes,Costo_Total_Linea,Price,FALSE,FALSE,,[Cantidad] * [Costo_Unitario_Snapshot] * (1 + [Merma_Porcentaje]/100),FALSE,,">=0","Costo total línea con merma",FALSE,8,5
+Receta_Ingredientes,Es_Opcional,Yes/No,FALSE,FALSE,,FALSE,,,,"Ingrediente opcional",TRUE,9,5
+Receta_Ingredientes,Orden,Number,FALSE,FALSE,,,,,">=0","Orden en receta",TRUE,10,5
+Receta_Ingredientes,Fecha_Creacion,DateTime,FALSE,FALSE,,NOW(),,,FALSE,"Auditoría",FALSE,11,5
+Receta_Ingredientes,Creado_Por,Text,FALSE,FALSE,,USEREMAIL(),,,FALSE,"Auditoría",FALSE,12,5
+Receta_Ingredientes,Sync_Pending?,Yes/No,FALSE,FALSE,,TRUE,,,FALSE,"Sync offline",FALSE,13,5
+Receta_Ingredientes,ID,Text,TRUE,FALSE,,UNIQUEID(),,,FALSE,"Key alias",FALSE,14,5
+Receta_Ingredientes,Created_At,DateTime,FALSE,FALSE,,NOW(),,,FALSE,"Auditoría estándar",FALSE,15,5
+Receta_Ingredientes,Created_By,Text,FALSE,FALSE,,USEREMAIL(),,,FALSE,"Auditoría estándar",FALSE,16,5
+Receta_Ingredientes,Updated_At,DateTime,FALSE,FALSE,,,NOW(),,FALSE,"Auditoría estándar",FALSE,17,5
+Receta_Ingredientes,Updated_By,Text,FALSE,FALSE,,,USEREMAIL(),,FALSE,"Auditoría estándar",FALSE,18,5
+Receta_Ingredientes,Deleted?,Yes/No,FALSE,FALSE,,FALSE,,,FALSE,"Soft delete",FALSE,19,5
+Receta_Ingredientes,Sucursal_ID,Ref,FALSE,TRUE,Sucursales,,LOOKUP([Receta_ID], "Recetas", "Receta_ID", "Sucursal_ID"),FALSE,"Security Filter hereda de receta",FALSE,20,5
+Produccion,Produccion_ID,Text,TRUE,FALSE,,UNIQUEID(),,,FALSE,"Clave única producción",FALSE,1,5
+Produccion,Receta_ID,Ref,FALSE,TRUE,Recetas,,,,,"Receta producida",TRUE,2,5
+Produccion,Sucursal_ID,Ref,FALSE,TRUE,Sucursales,LOOKUP([Receta_ID], "Recetas", "Receta_ID", "Sucursal_ID"),FALSE,,"Sucursal producción (hereda receta)",FALSE,3,5
+Produccion,Producida_Por,Text,FALSE,FALSE,,USEREMAIL(),,,FALSE,"Quién produce",FALSE,4,5
+Produccion,Fecha_Produccion,DateTime,FALSE,FALSE,,NOW(),,,FALSE,"Cuándo se produjo",TRUE,5,5
+Produccion,Cantidad_Producida,Decimal,FALSE,FALSE,,,,,">0","Cuánto se produjo",TRUE,6,5
+Produccion,Unidad_Produccion,Enum,FALSE,FALSE,,Porciones,,,"IN([_THIS], LIST(\"Porciones\", \"Kg\", \"Litros\", \"Unidades\"))","Unidad producción",TRUE,7,5
+Produccion,Lote,Text,FALSE,FALSE,,CONCATENATE("LOTE-", YEAR(NOW()), MONTH(NOW()), DAY(NOW()), "-", RANDBETWEEN(100,999)),,,FALSE,"Lote trazabilidad",FALSE,8,5
+Produccion,Estado,Enum,FALSE,FALSE,,En_Proceso,,,"IN([_THIS], LIST(\"En_Proceso\", \"Completada\", \"Cancelada\", \"Con_Diferencias\"))","Estado producción",FALSE,9,5
+Produccion,Observaciones,LongText,FALSE,FALSE,,,,,"Notas producción",TRUE,10,5
+Produccion,Costo_Teorico_Total,Price,FALSE,FALSE,,,[Cantidad_Producida] * LOOKUP([Receta_ID], "Recetas", "Receta_ID", "Costo_Por_Porciona"),FALSE,,">=0","Costo teórico total",FALSE,11,5
+Produccion,Costo_Real_Total,Price,FALSE,FALSE,,,,,">=0","Costo real (suma detalle)",FALSE,12,5
+Produccion,Variacion_Costo,Price,FALSE,FALSE,,[Costo_Real_Total] - [Costo_Teorico_Total],FALSE,,,"Variación real vs teórico",FALSE,13,5
+Produccion,Fecha_Creacion,DateTime,FALSE,FALSE,,NOW(),,,FALSE,"Auditoría",FALSE,14,5
+Produccion,Creado_Por,Text,FALSE,FALSE,,USEREMAIL(),,,FALSE,"Auditoría",FALSE,15,5
+Produccion,ID,Text,TRUE,FALSE,,UNIQUEID(),,,FALSE,"Key alias",FALSE,16,5
+Produccion,Created_At,DateTime,FALSE,FALSE,,NOW(),,,FALSE,"Auditoría estándar",FALSE,17,5
+Produccion,Created_By,Text,FALSE,FALSE,,USEREMAIL(),,,FALSE,"Auditoría estándar",FALSE,18,5
+Produccion,Updated_At,DateTime,FALSE,FALSE,,,NOW(),,FALSE,"Auditoría estándar",FALSE,19,5
+Produccion,Updated_By,Text,FALSE,FALSE,,,USEREMAIL(),,FALSE,"Auditoría estándar",FALSE,20,5
+Produccion,Deleted?,Yes/No,FALSE,FALSE,,FALSE,,,FALSE,"Soft delete",FALSE,21,5
+Produccion,Sync_Pending?,Yes/No,FALSE,FALSE,,TRUE,,,FALSE,"Sync offline",FALSE,22,5
+Produccion_Detalle,Prod_Det_ID,Text,TRUE,FALSE,,UNIQUEID(),,,FALSE,"Clave única detalle",FALSE,1,5
+Produccion_Detalle,Produccion_ID,Ref,FALSE,TRUE,Produccion,,,,,"Producción padre",FALSE,2,5
+Produccion_Detalle,Receta_Ing_ID,Ref,FALSE,TRUE,Receta_Ingredientes,,,,,"Línea BOM origen",FALSE,3,5
+Produccion_Detalle,Ingrediente_ID,Ref,FALSE,TRUE,Ingredientes_y_Stock,,LOOKUP([Receta_Ing_ID], "Receta_Ingredientes", "Receta_Ing_ID", "Ingrediente_ID"),FALSE,,"Ingrediente consumido",FALSE,4,5
+Produccion_Detalle,Cantidad_Teorica,Decimal,FALSE,FALSE,,LOOKUP([Receta_Ing_ID], "Receta_Ingredientes", "Receta_Ing_ID", "Cantidad") * ([Cantidad_Producida] / LOOKUP([Produccion_ID], "Produccion", "Produccion_ID", "Cantidad_Producida")),FALSE,,">=0","Teórico según receta y cantidad",FALSE,5,5
+Produccion_Detalle,Cantidad_Real,Decimal,FALSE,FALSE,,,,,">=0","Real consumido (operador ingresa)",TRUE,6,5
+Produccion_Detalle,Unidad_Medida,Text,FALSE,FALSE,,LOOKUP([Ingrediente_ID], "Ingredientes_y_Stock", "Ingrediente_ID", "Unidad_Base"),FALSE,,"Unidad (auto)",FALSE,7,5
+Produccion_Detalle,Diferencia,Decimal,FALSE,FALSE,,[Cantidad_Real] - [Cantidad_Teorica],FALSE,,,"Diff real - teórico",FALSE,8,5
+Produccion_Detalle,Merma_Real_Porcentaje,Decimal,FALSE,FALSE,,IF([Cantidad_Teorica]<>0, ([Diferencia]/[Cantidad_Teorica])*100, 0),FALSE,,,"% merma real",FALSE,9,5
+Produccion_Detalle,Costo_Teorico_Linea,Price,FALSE,FALSE,,LOOKUP([Receta_Ing_ID], "Receta_Ingredientes", "Receta_Ing_ID", "Costo_Total_Linea") * ([Cantidad_Producida] / LOOKUP([Produccion_ID], "Produccion", "Produccion_ID", "Cantidad_Producida")),FALSE,,">=0","Costo teórico línea",FALSE,10,5
+Produccion_Detalle,Costo_Real_Linea,Price,FALSE,FALSE,,[Cantidad_Real] * LOOKUP([Ingrediente_ID], "Ingredientes_y_Stock", "Ingrediente_ID", "Costo_Actual"),FALSE,,">=0","Costo real línea",FALSE,11,5
+Produccion_Detalle,Observacion,LongText,FALSE,FALSE,,,,,"Nota operador",TRUE,12,5
+Produccion_Detalle,Fecha_Creacion,DateTime,FALSE,FALSE,,NOW(),,,FALSE,"Auditoría",FALSE,13,5
+Produccion_Detalle,Creado_Por,Text,FALSE,FALSE,,USEREMAIL(),,,FALSE,"Auditoría",FALSE,14,5
+Produccion_Detalle,Sync_Pending?,Yes/No,FALSE,FALSE,,TRUE,,,FALSE,"Sync offline",FALSE,15,5
+Produccion_Detalle,ID,Text,TRUE,FALSE,,UNIQUEID(),,,FALSE,"Key alias",FALSE,16,5
+Produccion_Detalle,Created_At,DateTime,FALSE,FALSE,,NOW(),,,FALSE,"Auditoría estándar",FALSE,17,5
+Produccion_Detalle,Created_By,Text,FALSE,FALSE,,USEREMAIL(),,,FALSE,"Auditoría estándar",FALSE,18,5
+Produccion_Detalle,Updated_At,DateTime,FALSE,FALSE,,,NOW(),,FALSE,"Auditoría estándar",FALSE,19,5
+Produccion_Detalle,Updated_By,Text,FALSE,FALSE,,,USEREMAIL(),,FALSE,"Auditoría estándar",FALSE,20,5
+Produccion_Detalle,Deleted?,Yes/No,FALSE,FALSE,,FALSE,,,FALSE,"Soft delete",FALSE,21,5
+Produccion_Detalle,Sucursal_ID,Ref,FALSE,TRUE,Sucursales,,LOOKUP([Produccion_ID], "Produccion", "Produccion_ID", "Sucursal_ID"),FALSE,"Security Filter hereda de producción",FALSE,22,5
+Costos_Historicos,Costo_ID,Text,TRUE,FALSE,,UNIQUEID(),,,FALSE,"Clave única histórico",FALSE,1,5
+Costos_Historicos,Entidad_Tipo,Enum,FALSE,FALSE,,Ingrediente,,,"IN([_THIS], LIST(\"Ingrediente\", \"Receta\"))","Tipo entidad",TRUE,2,5
+Costos_Historicos,Entidad_ID,Text,FALSE,FALSE,,,,,"ID ingrediente o receta",TRUE,3,5
+Costos_Historicos,Sucursal_ID,Ref,FALSE,TRUE,Sucursales,,,,,"Sucursal",TRUE,4,5
+Costos_Historicos,Costo_Anterior,Price,FALSE,FALSE,,,,,">=0","Costo antes del cambio",FALSE,5,5
+Costos_Historicos,Costo_Nuevo,Price,FALSE,FALSE,,,,,">=0","Costo después del cambio",TRUE,6,5
+Costos_Historicos,Variacion_Porcentaje,Decimal,FALSE,FALSE,,IF([Costo_Anterior]<>0, (([Costo_Nuevo]-[Costo_Anterior])/[Costo_Anterior])*100, 0),FALSE,,,"% variación",FALSE,7,5
+Costos_Historicos,Variacion_Absoluta,Price,FALSE,FALSE,,[Costo_Nuevo] - [Costo_Anterior],FALSE,,,"$ variación",FALSE,8,5
+Costos_Historicos,Fuente_Cambio,Enum,FALSE,FALSE,,Manual,,,"IN([_THIS], LIST(\"Manual\", \"Actualizacion_Proveedor\", \"Recalculo_Ingredientes\", \"Ajuste_Inventario\", \"Produccion\"))","Origen del cambio",TRUE,9,5
+Costos_Historicos,Cambiado_Por,Text,FALSE,FALSE,,USEREMAIL(),,,FALSE,"Quién cambió",FALSE,10,5
+Costos_Historicos,Fecha_Cambio,DateTime,FALSE,FALSE,,NOW(),,,FALSE,"Cuándo",FALSE,11,5
+Costos_Historicos,Aprobado_Por,Text,FALSE,FALSE,,,,,FALSE,"Quién aprobó (si requería)",FALSE,12,5
+Costos_Historicos,Fecha_Aprobacion,DateTime,FALSE,FALSE,,,,,FALSE,"Cuándo aprobó",FALSE,13,5
+Costos_Historicos,Activo?,Yes/No,FALSE,FALSE,,TRUE,,,,"Registro activo",TRUE,14,5
+Costos_Historicos,Fecha_Creacion,DateTime,FALSE,FALSE,,NOW(),,,FALSE,"Auditoría",FALSE,15,5
+Costos_Historicos,Creado_Por,Text,FALSE,FALSE,,USEREMAIL(),,,FALSE,"Auditoría",FALSE,16,5
+Costos_Historicos,Sync_Pending?,Yes/No,FALSE,FALSE,,TRUE,,,FALSE,"Sync offline",FALSE,17,5
+Costos_Historicos,ID,Text,TRUE,FALSE,,UNIQUEID(),,,FALSE,"Key alias",FALSE,18,5
+Costos_Historicos,Created_At,DateTime,FALSE,FALSE,,NOW(),,,FALSE,"Auditoría estándar",FALSE,19,5
+Costos_Historicos,Created_By,Text,FALSE,FALSE,,USEREMAIL(),,,FALSE,"Auditoría estándar",FALSE,20,5
+Costos_Historicos,Updated_At,DateTime,FALSE,FALSE,,,NOW(),,FALSE,"Auditoría estándar",FALSE,21,5
+Costos_Historicos,Updated_By,Text,FALSE,FALSE,,,USEREMAIL(),,FALSE,"Auditoría estándar",FALSE,22,5
+Costos_Historicos,Deleted?,Yes/No,FALSE,FALSE,,FALSE,,,FALSE,"Soft delete",FALSE,23,5
+Costos_Historicos,Sucursal_ID,Ref,FALSE,TRUE,Sucursales,,,,,"Security Filter hereda",FALSE,24,5

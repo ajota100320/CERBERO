@@ -1,0 +1,4 @@
+Item_ID,Orden_ID,Ingrediente_ID,Cantidad_Solicitada,Unidad_Medida,Cantidad_Preparada,Cantidad_Despachada,Cantidad_Recibida,Diferencia_Recepcion,Estado_Item,Observacion_Preparador,Observacion_Receptor,Fecha_Creacion,Creado_Por,Sync_Pending?
+ITM_TRF_001,ORD_001,[Ingrediente_ID_1],10,"Kg",,,,"Pendiente","","",NOW(),USEREMAIL(),TRUE
+ITM_TRF_002,ORD_001,[Ingrediente_ID_2],5,"Kg",,,,"Pendiente","","",NOW(),USEREMAIL(),TRUE
+ITM_TRF_003,ORD_002,[Ingrediente_ID_3],20,"Kg",,,,"Pendiente","","",NOW(),USEREMAIL(),TRUE

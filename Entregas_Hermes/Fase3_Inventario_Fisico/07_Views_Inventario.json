@@ -1,0 +1,282 @@
+[
+  {
+    "ViewName": "View_Plantillas_Inventario_Encargado",
+    "TableName": "Plantillas_Inventario",
+    "Type": "Deck",
+    "Position": 1,
+    "ShowIf": "OR(USERROLE(\"Administrador\"), USERROLE(\"Encargado\"))",
+    "Columns": [
+      "Nombre",
+      "Descripcion",
+      "Tipo_Frecuencia",
+      "Categoria_Filtro",
+      "Activa?",
+      "Sucursal_ID"
+    ],
+    "RowFilter": "OR(USERROLE(\"Administrador\"), [Sucursal_ID] = LOOKUP(USEREMAIL(), \"Usuarios_Sucursales\", \"Email\", \"Sucursal_ID\"))",
+    "OrderBy": "Nombre",
+    "GroupBy": "Tipo_Frecuencia",
+    "Options": {
+      "ShowSearch": true,
+      "ShowSelect": false,
+      "AllowInlineEdit": false
+    },
+    "Actions": [
+      "Inventario_Iniciar_Conteo"
+    ]
+  },
+  {
+    "ViewName": "View_Conteo_Formulario_Nuevo",
+    "TableName": "Conteos_Inventario",
+    "Type": "Form",
+    "Position": 2,
+    "ShowIf": "OR(USERROLE(\"Administrador\"), USERROLE(\"Encargado\"))",
+    "Columns": [
+      "Plantilla_ID",
+      "Observaciones"
+    ],
+    "InitialValues": {
+      "Sucursal_ID": "LOOKUP(USEREMAIL(), \"Usuarios_Sucursales\", \"Email\", \"Sucursal_ID\")",
+      "Iniciado_Por": "USEREMAIL()",
+      "Fecha_Inicio": "NOW()",
+      "Estado": "\"Borrador\"",
+      "Sync_Pending?": "TRUE"
+    },
+    "Options": {
+      "ShowCancelButton": true,
+      "ShowSaveButton": true
+    }
+  },
+  {
+    "ViewName": "View_Conteos_Encargado_Gestion",
+    "TableName": "Conteos_Inventario",
+    "Type": "Table",
+    "Position": 3,
+    "ShowIf": "OR(USERROLE(\"Administrador\"), USERROLE(\"Encargado\"))",
+    "Columns": [
+      "Plantilla_ID",
+      "Estado",
+      "Fecha_Inicio",
+      "Fecha_Fin",
+      "Iniciado_Por",
+      "Observaciones"
+    ],
+    "RowFilter": "OR(USERROLE(\"Administrador\"), [Sucursal_ID] = LOOKUP(USEREMAIL(), \"Usuarios_Sucursales\", \"Email\", \"Sucursal_ID\"))",
+    "OrderBy": "Fecha_Inicio DESC",
+    "GroupBy": "Estado",
+    "Options": {
+      "ShowSearch": true,
+      "ShowSelect": true,
+      "AllowInlineEdit": false
+    },
+    "Actions": [
+      "Conteo_Comenzar",
+      "Conteo_Completar",
+      "Conteo_Aprobar",
+      "Conteo_Rechazar",
+      "Conteo_Anular"
+    ]
+  },
+  {
+    "ViewName": "View_Conteos_Operador_Asignados",
+    "TableName": "Conteos_Inventario",
+    "Type": "Deck",
+    "Position": 1,
+    "ShowIf": "USERROLE(\"Operador\")",
+    "Columns": [
+      "Plantilla_ID",
+      "Estado",
+      "Fecha_Inicio",
+      "Fecha_Fin",
+      "Iniciado_Por"
+    ],
+    "RowFilter": "AND([Sucursal_ID] = LOOKUP(USEREMAIL(), \"Usuarios_Sucursales\", \"Email\", \"Sucursal_ID\"), IN([Estado], LIST(\"En_Progreso\", \"Completado\", \"Con_Diferencias\")))",
+    "OrderBy": "Fecha_Inicio DESC",
+    "GroupBy": "Estado",
+    "Options": {
+      "ShowSearch": true,
+      "ShowSelect": false,
+      "AllowInlineEdit": false
+    }
+  },
+  {
+    "ViewName": "View_Items_Conteo_Operador_Contar",
+    "TableName": "Items_Conteo",
+    "Type": "Table",
+    "Position": 2,
+    "ShowIf": "USERROLE(\"Operador\")",
+    "Columns": [
+      "Ingrediente_ID",
+      "Stock_Teorico",
+      "Unidad_Medida",
+      "Stock_Contado",
+      "Diferencia",
+      "Porcentaje_Diferencia",
+      "Esta_Fuera_Tolerancia?",
+      "Observacion_Contador",
+      "Fecha_Conteo",
+      "Contado_Por"
+    ],
+    "RowFilter": "AND([Conteo_ID].[Estado] = \"En_Progreso\", [Conteo_ID].[Sucursal_ID] = LOOKUP(USEREMAIL(), \"Usuarios_Sucursales\", \"Email\", \"Sucursal_ID\"))",
+    "OrderBy": "Ingrediente_ID",
+    "Options": {
+      "ShowSearch": true,
+      "ShowSelect": false,
+      "AllowInlineEdit": true
+    },
+    "Actions": [
+      "Conteo_Registrar_Item"
+    ]
+  },
+  {
+    "ViewName": "View_Items_Conteo_Encargado_Revision",
+    "TableName": "Items_Conteo",
+    "Type": "Table",
+    "Position": 3,
+    "ShowIf": "OR(USERROLE(\"Administrador\"), USERROLE(\"Encargado\"))",
+    "Columns": [
+      "Conteo_ID",
+      "Ingrediente_ID",
+      "Stock_Teorico",
+      "Stock_Contado",
+      "Unidad_Medida",
+      "Diferencia",
+      "Porcentaje_Diferencia",
+      "Esta_Fuera_Tolerancia?",
+      "Tolerancia_Aplicada",
+      "Observacion_Contador",
+      "Contado_Por",
+      "Fecha_Conteo"
+    ],
+    "RowFilter": "OR(USERROLE(\"Administrador\"), [Conteo_ID].[Sucursal_ID] = LOOKUP(USEREMAIL(), \"Usuarios_Sucursales\", \"Email\", \"Sucursal_ID\"))",
+    "OrderBy": "Conteo_ID, Porcentaje_Diferencia DESC",
+    "GroupBy": "Esta_Fuera_Tolerancia?",
+    "Options": {
+      "ShowSearch": true,
+      "ShowSelect": true,
+      "AllowInlineEdit": false
+    }
+  },
+  {
+    "ViewName": "View_Ajustes_Inventario_Encargado",
+    "TableName": "Ajustes_Inventario",
+    "Type": "Table",
+    "Position": 4,
+    "ShowIf": "OR(USERROLE(\"Administrador\"), USERROLE(\"Encargado\"))",
+    "Columns": [
+      "Conteo_ID",
+      "Ingrediente_ID",
+      "Stock_Anterior",
+      "Stock_Nuevo",
+      "Diferencia_Ajuste",
+      "Tipo_Ajuste",
+      "Estado",
+      "Aprobado_Por",
+      "Fecha_Aprobacion",
+      "Genero_Merma_Auto?",
+      "Merma_ID_Generada"
+    ],
+    "RowFilter": "OR(USERROLE(\"Administrador\"), [Conteo_ID].[Sucursal_ID] = LOOKUP(USEREMAIL(), \"Usuarios_Sucursales\", \"Email\", \"Sucursal_ID\"))",
+    "OrderBy": "Fecha_Aprobacion DESC",
+    "GroupBy": "Estado",
+    "Options": {
+      "ShowSearch": true,
+      "ShowSelect": true,
+      "AllowInlineEdit": false
+    },
+    "Actions": [
+      "Ajuste_Aplicar_Stock"
+    ]
+  },
+  {
+    "ViewName": "View_Inventario_Dashboard_Encargado",
+    "TableName": "Conteos_Inventario",
+    "Type": "Dashboard",
+    "Position": 5,
+    "ShowIf": "OR(USERROLE(\"Administrador\"), USERROLE(\"Encargado\"))",
+    "Columns": [
+      "Estado",
+      "Plantilla_ID",
+      "Fecha_Inicio"
+    ],
+    "RowFilter": "OR(USERROLE(\"Administrador\"), [Sucursal_ID] = LOOKUP(USEREMAIL(), \"Usuarios_Sucursales\", \"Email\", \"Sucursal_ID\"))",
+    "Options": {
+      "Charts": [
+        {
+          "Name": "Conteos por Estado (Mes)",
+          "Type": "Pie",
+          "Dimension": "Estado",
+          "Measure": "COUNT(*)",
+          "Filter": "[Fecha_Inicio] >= TODAY() - 30"
+        },
+        {
+          "Name": "Items Fuera de Tolerancia por Conteo",
+          "Type": "Bar",
+          "Dimension": "Conteo_ID",
+          "Measure": "COUNT(FILTER(\"Items_Conteo\", AND([Conteo_ID] = [_THISROW].[Conteo_ID], [Esta_Fuera_Tolerancia?] = TRUE)))",
+          "Filter": "[Fecha_Inicio] >= TODAY() - 30"
+        },
+        {
+          "Name": "Porcentaje Diferencia Promedio por Ingrediente",
+          "Type": "Line",
+          "Dimension": "DATE([Fecha_Conteo])",
+          "Measure": "AVERAGE(ABS([Porcentaje_Diferencia]))",
+          "Filter": "[Fecha_Conteo] >= TODAY() - 90"
+        }
+      ],
+      "KPIs": [
+        {
+          "Name": "Conteos Pendientes de Iniciar",
+          "Expression": "COUNT(FILTER(\"Conteos_Inventario\", AND([Estado] = \"Borrador\", [Fecha_Programada] <= TODAY(), [Sucursal_ID] = LOOKUP(USEREMAIL(), \"Usuarios_Sucursales\", \"Email\", \"Sucursal_ID\"))))",
+          "Icon": "alert-circle",
+          "Color": "Warning"
+        },
+        {
+          "Name": "Conteos En Progreso",
+          "Expression": "COUNT(FILTER(\"Conteos_Inventario\", AND([Estado] = \"En_Progreso\", [Sucursal_ID] = LOOKUP(USEREMAIL(), \"Usuarios_Sucursales\", \"Email\", \"Sucursal_ID\"))))",
+          "Icon": "play-circle",
+          "Color": "Info"
+        },
+        {
+          "Name": "Items Fuera Tolerancia (Semana)",
+          "Expression": "COUNT(FILTER(\"Items_Conteo\", AND([Esta_Fuera_Tolerancia?] = TRUE, [Fecha_Conteo] >= TODAY() - 7, [Conteo_ID].[Sucursal_ID] = LOOKUP(USEREMAIL(), \"Usuarios_Sucursales\", \"Email\", \"Sucursal_ID\"))))",
+          "Icon": "trending-up",
+          "Color": "Danger"
+        },
+        {
+          "Name": "Ajustes Aplicados (Mes)",
+          "Expression": "COUNT(FILTER(\"Ajustes_Inventario\", AND([Estado] = \"Aplicado\", [Fecha_Aprobacion] >= TODAY() - 30, [Conteo_ID].[Sucursal_ID] = LOOKUP(USEREMAIL(), \"Usuarios_Sucursales\", \"Email\", \"Sucursal_ID\"))))",
+          "Icon": "check-circle",
+          "Color": "Success"
+        }
+      ]
+    }
+  },
+  {
+    "ViewName": "View_Plantillas_Inventario_Admin_Todas",
+    "TableName": "Plantillas_Inventario",
+    "Type": "Table",
+    "Position": 1,
+    "ShowIf": "USERROLE(\"Administrador\")",
+    "Columns": [
+      "Plantilla_ID",
+      "Nombre",
+      "Sucursal_ID",
+      "Tipo_Frecuencia",
+      "Categoria_Filtro",
+      "Activa?",
+      "Fecha_Creacion",
+      "Creado_Por"
+    ],
+    "OrderBy": "Sucursal_ID, Nombre",
+    "GroupBy": "Sucursal_ID",
+    "Options": {
+      "ShowSearch": true,
+      "ShowSelect": true,
+      "AllowInlineEdit": true
+    },
+    "Actions": [
+      "Inventario_Iniciar_Conteo"
+    ]
+  }
+]

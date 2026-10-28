@@ -1,0 +1,226 @@
+[
+  {
+    "ActionName": "Inventario_Iniciar_Conteo",
+    "Type": "App: go to a view within this app",
+    "Description": "Inicia un nuevo conteo desde una plantilla (Encargado)",
+    "TableName": "Plantillas_Inventario",
+    "Icon": "play-arrow",
+    "ShowIf": "OR(USERROLE(\"Administrador\"), AND(USERROLE(\"Encargado\"), [Sucursal_ID] = LOOKUP(USEREMAIL(), \"Usuarios_Sucursales\", \"Email\", \"Sucursal_ID\")))",
+    "TargetView": "View_Conteo_Formulario_Nuevo"
+  },
+  {
+    "ActionName": "Conteo_Comenzar",
+    "Type": "Data: execute an action on a set of rows",
+    "Description": "Cambia estado a 'En_Progreso', setea Fecha_Inicio, crea Items_Conteo desde Plantilla",
+    "TableName": "Conteos_Inventario",
+    "ShowIf": "AND([Estado] = \"Borrador\", OR(USERROLE(\"Administrador\"), AND(USERROLE(\"Encargado\"), [Sucursal_ID] = LOOKUP(USEREMAIL(), \"Usuarios_Sucursales\", \"Email\", \"Sucursal_ID\"))))",
+    "ReferencedAction": "Action_Crear_Items_Desde_Plantilla",
+    "RunAsJob": true
+  },
+  {
+    "ActionName": "Action_Crear_Items_Desde_Plantilla",
+    "Type": "Data: add a new row to a table",
+    "Description": "Crea filas en Items_Conteo para cada ingrediente de la plantilla",
+    "TableName": "Items_Conteo",
+    "RowSelection": {
+      "Type": "Expression",
+      "Expression": "FILTER(\"Ingredientes_y_Stock\", AND([Sucursal_ID] = [_THISROW].[Sucursal_ID], [Activo?] = TRUE, IF([_THISROW].[Plantilla_ID].[Categoria_Filtro] = \"Todos\", TRUE, [Categoria] = [_THISROW].[Plantilla_ID].[Categoria_Filtro])))"
+    },
+    "InitialValues": {
+      "Conteo_ID": "[_THISROW].[Conteo_ID]",
+      "Ingrediente_ID": "[_THISROW].[Ingrediente_ID]",
+      "Stock_Teorico": "[_THISROW].[Stock_Actual]",
+      "Unidad_Medida": "[_THISROW].[Unidad_Base]",
+      "Stock_Contado": "",
+      "Observacion_Contador": "",
+      "Fecha_Conteo": "NOW()",
+      "Contado_Por": "USEREMAIL()",
+      "Sync_Pending?": "TRUE"
+    },
+    "Condition": "ISNOTBLANK([_THISROW].[Plantilla_ID])"
+  },
+  {
+    "ActionName": "Conteo_Registrar_Item",
+    "Type": "Data: edit a row",
+    "Description": "Operador registra stock contado para un item",
+    "TableName": "Items_Conteo",
+    "ShowIf": "AND([Conteo_ID].[Estado] = \"En_Progreso\", OR(USERROLE(\"Operador\"), USERROLE(\"Encargado\"), USERROLE(\"Administrador\")))",
+    "Columns": [
+      "Stock_Contado",
+      "Observacion_Contador",
+      "Fecha_Conteo",
+      "Contado_Por",
+      "Sync_Pending?"
+    ],
+    "InitialValues": {
+      "Stock_Contado": "",
+      "Observacion_Contador": "",
+      "Fecha_Conteo": "NOW()",
+      "Contado_Por": "USEREMAIL()",
+      "Sync_Pending?": "TRUE"
+    }
+  },
+  {
+    "ActionName": "Conteo_Completar",
+    "Type": "Data: execute an action on a set of rows",
+    "Description": "Marca conteo como Completado, valida que todos los items tengan Stock_Contado",
+    "TableName": "Conteos_Inventario",
+    "ShowIf": "AND([Estado] = \"En_Progreso\", OR(USERROLE(\"Administrador\"), AND(USERROLE(\"Encargado\"), [Sucursal_ID] = LOOKUP(USEREMAIL(), \"Usuarios_Sucursales\", \"Email\", \"Sucursal_ID\"))))",
+    "ReferencedAction": "Action_Validar_Conteo_Completo",
+    "RunAsJob": true
+  },
+  {
+    "ActionName": "Action_Validar_Conteo_Completo",
+    "Type": "Data: set column values",
+    "Description": "Valida items completados y cambia estado a Completado/Con_Diferencias",
+    "TableName": "Conteos_Inventario",
+    "Columns": [
+      "Estado",
+      "Fecha_Fin",
+      "Sync_Pending?"
+    ],
+    "Values": [
+      "IF(COUNT(FILTER(\"Items_Conteo\", AND([Conteo_ID] = [_THISROW].[Conteo_ID], ISBLANK([Stock_Contado]))) > 0, \"Borrador\", IF(COUNT(FILTER(\"Items_Conteo\", AND([Conteo_ID] = [_THISROW].[Conteo_ID], [Esta_Fuera_Tolerancia?] = TRUE))) > 0, \"Con_Diferencias\", \"Completado\"))",
+      "NOW()",
+      "TRUE"
+    ],
+    "Condition": "COUNT(FILTER(\"Items_Conteo\", AND([Conteo_ID] = [_THISROW].[Conteo_ID], ISBLANK([Stock_Contado]))) = 0"
+  },
+  {
+    "ActionName": "Conteo_Aprobar",
+    "Type": "Data: execute an action on a set of rows",
+    "Description": "Encargado/Admin aprueba conteo → genera Ajustes_Inventario para items fuera de tolerancia",
+    "TableName": "Conteos_Inventario",
+    "ShowIf": "AND(IN([Estado], LIST(\"Completado\", \"Con_Diferencias\")), OR(USERROLE(\"Administrador\"), AND(USERROLE(\"Encargado\"), [Sucursal_ID] = LOOKUP(USEREMAIL(), \"Usuarios_Sucursales\", \"Email\", \"Sucursal_ID\"))))",
+    "ReferencedAction": "Action_Generar_Ajustes_Aprobados",
+    "RunAsJob": true
+  },
+  {
+    "ActionName": "Action_Generar_Ajustes_Aprobados",
+    "Type": "Data: add a new row to a table",
+    "Description": "Crea registros en Ajustes_Inventario para cada item con diferencia",
+    "TableName": "Ajustes_Inventario",
+    "RowSelection": {
+      "Type": "Expression",
+      "Expression": "FILTER(\"Items_Conteo\", AND([Conteo_ID] = [_THISROW].[Conteo_ID], [Diferencia] <> 0))"
+    },
+    "InitialValues": {
+      "Conteo_ID": "[_THISROW].[Conteo_ID]",
+      "Item_ID": "[_THISROW].[Item_ID]",
+      "Ingrediente_ID": "[_THISROW].[Ingrediente_ID]",
+      "Sucursal_ID": "[_THISROW].[Conteo_ID].[Sucursal_ID]",
+      "Stock_Anterior": "[_THISROW].[Stock_Teorico]",
+      "Stock_Nuevo": "[_THISROW].[Stock_Contado]",
+      "Diferencia_Ajuste": "[_THISROW].[Diferencia]",
+      "Tipo_Ajuste": "IF([_THISROW].[Diferencia] < 0, \"Merma_Automatica\", \"Ajuste_Positivo\")",
+      "Aprobado_Por": "USEREMAIL()",
+      "Fecha_Aprobacion": "NOW()",
+      "Estado": "Aprobado",
+      "Genero_Merma_Auto?": "IF([_THISROW].[Diferencia] < 0, TRUE, FALSE)",
+      "Fecha_Creacion": "NOW()",
+      "Creado_Por": "USEREMAIL()",
+      "Sync_Pending?": "TRUE"
+    },
+    "Condition": "[_THISROW].[Estado] IN LIST(\"Completado\", \"Con_Diferencias\")"
+  },
+  {
+    "ActionName": "Ajuste_Aplicar_Stock",
+    "Type": "Data: execute an action on a set of rows",
+    "Description": "Aplica el ajuste al stock real en Ingredientes_y_Stock + genera merma si corresponde",
+    "TableName": "Ajustes_Inventario",
+    "ShowIf": "AND([Estado] = \"Aprobado\", OR(USERROLE(\"Administrador\"), AND(USERROLE(\"Encargado\"), [Sucursal_ID] = LOOKUP(USEREMAIL(), \"Usuarios_Sucursales\", \"Email\", \"Sucursal_ID\"))))",
+    "ReferencedAction": "Action_Aplicar_Ajuste_Stock",
+    "RunAsJob": true
+  },
+  {
+    "ActionName": "Action_Aplicar_Ajuste_Stock",
+    "Type": "Data: execute an action on a set of rows",
+    "Description": "Actualiza Stock_Actual en Ingredientes_y_Stock + crea merma automática si diff < 0",
+    "TableName": "Ingredientes_y_Stock",
+    "RowSelection": {
+      "Type": "Expression",
+      "Expression": "FILTER(\"Ingredientes_y_Stock\", AND([Ingrediente_ID] = [_THISROW].[Ingrediente_ID], [Sucursal_ID] = [_THISROW].[Sucursal_ID]))"
+    },
+    "ReferencedAction": "Action_Actualizar_Stock_Ingrediente",
+    "RunAsJob": true
+  },
+  {
+    "ActionName": "Action_Actualizar_Stock_Ingrediente",
+    "Type": "Data: set column values",
+    "Description": "Setea Stock_Actual = Stock_Nuevo del ajuste",
+    "TableName": "Ingredientes_y_Stock",
+    "Columns": [
+      "Stock_Actual",
+      "Updated_At",
+      "Updated_By",
+      "Sync_Pending?"
+    ],
+    "Values": [
+      "[_THISROW].[Ajustes_Inventario].[Stock_Nuevo]",
+      "NOW()",
+      "USEREMAIL()",
+      "TRUE"
+    ],
+    "Condition": "[_THISROW].[Ajustes_Inventario].[Estado] = \"Aprobado\""
+  },
+  {
+    "ActionName": "Merma_Auto_Desde_Ajuste",
+    "Type": "Data: add a new row to a table",
+    "Description": "Crea registro en Registro_de_Mermas_y_Vencimientos tipo 'Ajuste_Inventario'",
+    "TableName": "Registro_de_Mermas_y_Vencimientos",
+    "Condition": "AND([_THISROW].[Genero_Merma_Auto?] = TRUE, [_THISROW].[Diferencia_Ajuste] < 0)",
+    "InitialValues": {
+      "Ingrediente_ID": "[_THISROW].[Ingrediente_ID]",
+      "Tipo_Merma": "\"Ajuste_Inventario\"",
+      "Cantidad": "ABS([_THISROW].[Diferencia_Ajuste])",
+      "Unidad_Medida": "[_THISROW].[Ingrediente_ID].[Unidad_Base]",
+      "Costo_Unitario_Estimado": "[_THISROW].[Ingrediente_ID].[Costo_Actual]",
+      "Costo_Total_Estimado": "ABS([_THISROW].[Diferencia_Ajuste]) * [_THISROW].[Ingrediente_ID].[Costo_Actual]",
+      "Motivo": "CONCATENATE(\"Ajuste automático por conteo \", [_THISROW].[Conteo_ID], \": diferencia de \", ABS([_THISROW].[Diferencia_Ajuste]), \" \", [_THISROW].[Unidad_Medida])",
+      "Evidencia_Foto": "",
+      "Ubicacion_Especifica": "[_THISROW].[Conteo_ID].[Sucursal_ID].[Nombre]",
+      "Turno": "\"No_Aplica\"",
+      "Reportado_Por": "USEREMAIL()",
+      "Fecha_Hora_Evento": "NOW()",
+      "Estado_Merma": "\"Aprobada\"",
+      "Aprobado_Por": "USEREMAIL()",
+      "Fecha_Aprobacion": "NOW()",
+      "Sucursal_ID": "[_THISROW].[Sucursal_ID]",
+      "Sync_Pending?": "TRUE"
+    }
+  },
+  {
+    "ActionName": "Conteo_Rechazar",
+    "Type": "Data: set column values",
+    "Description": "Encargado/Admin rechaza conteo → vuelve a Borrador",
+    "TableName": "Conteos_Inventario",
+    "ShowIf": "AND(IN([Estado], LIST(\"Completado\", \"Con_Diferencias\")), OR(USERROLE(\"Administrador\"), AND(USERROLE(\"Encargado\"), [Sucursal_ID] = LOOKUP(USEREMAIL(), \"Usuarios_Sucursales\", \"Email\", \"Sucursal_ID\"))))",
+    "Columns": [
+      "Estado",
+      "Observaciones",
+      "Sync_Pending?"
+    ],
+    "Values": [
+      "\"Rechazado\"",
+      "CONCATENATE(IF(ISBLANK([Observaciones]), \"\", [Observaciones] & \" | \"), \"Rechazado por \", USEREMAIL(), \": \", NOW())",
+      "TRUE"
+    ]
+  },
+  {
+    "ActionName": "Conteo_Anular",
+    "Type": "Data: set column values",
+    "Description": "Admin anula conteo (soft delete + estado Anulado)",
+    "TableName": "Conteos_Inventario",
+    "ShowIf": "AND(USERROLE(\"Administrador\"), IN([Estado], LIST(\"Borrador\", \"En_Progreso\", \"Completado\", \"Con_Diferencias\", \"Rechazado\")))",
+    "Columns": [
+      "Estado",
+      "Deleted?",
+      "Sync_Pending?"
+    ],
+    "Values": [
+      "\"Anulado\"",
+      "TRUE",
+      "TRUE"
+    ]
+  }
+]

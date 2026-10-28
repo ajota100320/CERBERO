@@ -1,0 +1,9 @@
+Tabla_ID,Nombre_Tabla,Descripcion,Es_Nueva?,Key_Column,Ref_Tablas,Fase
+Tareas,Tareas,"Catálogo de tareas operativas: apertura, cierre, limpieza, prep, inventario, mantenimiento",TRUE,Tarea_ID,"Sucursales, Categorias, Usuarios, Roles",6
+Tarea_Programaciones,Tarea_Programaciones,"Horarios recurrentes: cada tarea, días, horas, responsable, recurrencia",TRUE,Prog_ID,"Tareas, Sucursales, Usuarios, Usuarios_Sucursales",6
+Tarea_Ejecuciones,Tarea_Ejecuciones,"Registro real de ejecución: qué tarea, cuándo, quién, duración, evidencia, checklist",TRUE,Ejec_ID,"Tareas, Tarea_Programaciones, Usuarios, Sucursales",6
+KPI_Definiciones,KPI_Definiciones,"Catálogo de KPIs: fórmula, umbrales, frecuencia, responsables, visualización",TRUE,KPI_ID,"Sucursales, Usuarios",6
+KPI_Registros_KPI,Registros_KPI,"Historial de valores de KPI por período/sucursal para tendencias",TRUE,Registro_ID,"KPI_Definiciones, Sucursales, Usuarios",6
+Capacitaciones,Capacitaciones,"Módulos de formación: título, contenido, duración, tipo, versión, aprobación",TRUE,Capac_ID,"Usuarios, Categorias, Sucursales",6
+Capacitaciones_Usuarios,Capacitaciones_Usuarios,"Asignación y seguimiento: quién debe/ha hecho qué capacitación, estado, fecha vencimiento",TRUE,Cap_Usu_ID,"Capacitaciones, Usuarios, Usuarios_Sucursales",6
+Incidencias,Incidencias,"Registro de incidencias: tipo, severidad, sucursal, reporte, asignado, SLA, resolución",TRUE,Inc_ID,"Sucursales, Usuarios, Categorias, Tareas",6

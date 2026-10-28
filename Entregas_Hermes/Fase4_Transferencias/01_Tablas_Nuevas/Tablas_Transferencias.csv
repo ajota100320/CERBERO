@@ -1,0 +1,4 @@
+Tabla_ID,Nombre_Tabla,Descripcion,Es_Nueva?,Key_Column,Ref_Tablas,Fase
+Ordenes_Transferencia,Ordenes_Transferencia,"Cabecera de transferencia entre sucursales: origen, destino, estado, responsables",TRUE,Orden_ID,"Sucursales (x2), Usuarios, Usuarios_Sucursales",4
+Items_Transferencia,Items_Transferencia,"Detalle de ingredientes a transferir: cantidades, estado preparación/recepción",TRUE,Item_ID,"Ordenes_Transferencia, Ingredientes_y_Stock, Unidades",4
+Recepciones_Transferencia,Recepciones_Transferencia,"Registro de recepción física en destino con validación de cantidades",TRUE,Recepcion_ID,"Ordenes_Transferencia, Items_Transferencia, Usuarios, Sucursales",4

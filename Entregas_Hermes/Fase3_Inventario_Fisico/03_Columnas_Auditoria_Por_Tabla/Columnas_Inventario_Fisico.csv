@@ -1,0 +1,80 @@
+Tabla_Objetivo,Nombre_Columna,Tipo_Dato,Es_Key?,Es_Ref?,Ref_Table,Initial_Value,App_Formula,Show_If,Valid_If,Descripcion,Editable_En_Formulario?,Orden,Fase
+Plantillas_Inventario,Plantilla_ID,Text,TRUE,FALSE,,UNIQUEID(),,,FALSE,"Clave única plantilla",FALSE,1,3
+Plantillas_Inventario,Nombre,Text,FALSE,FALSE,,,,,"LEN([_THIS]) >= 3","Nombre visible",TRUE,2,3
+Plantillas_Inventario,Descripcion,LongText,FALSE,FALSE,,,,,"Descripción de qué incluye",TRUE,3,3
+Plantillas_Inventario,Sucursal_ID,Ref,FALSE,TRUE,Sucursales,LOOKUP(USEREMAIL(), "Usuarios_Sucursales", "Email", "Sucursal_ID"),FALSE,"IN([_THIS], SELECT(Sucursales[Sucursal_ID], [Activa?]=TRUE))","Sucursal propietaria",FALSE,4,3
+Plantillas_Inventario,Tipo_Frecuencia,Enum,FALSE,FALSE,,Diario,,,"IN([_THIS], LIST(\"Diario\", \"Semanal\", \"Mensual\", \"Eventual\"))","Frecuencia planificada",TRUE,5,3
+Plantillas_Inventario,Categoria_Filtro,Enum,FALSE,FALSE,,Todos,,,"IN([_THIS], LIST(\"Todos\", \"Criticos\", \"Alto_Valor\", \"Perecederos\", \"Bebidas\", \"Secos\"))","Qué ingredientes incluir",TRUE,6,3
+Plantillas_Inventario,Activa?,Yes/No,FALSE,FALSE,,TRUE,,,,"Plantilla activa para uso",TRUE,7,3
+Plantillas_Inventario,Fecha_Creacion,DateTime,FALSE,FALSE,,NOW(),,,FALSE,"Auditoría",FALSE,8,3
+Plantillas_Inventario,Creado_Por,Text,FALSE,FALSE,,USEREMAIL(),,,FALSE,"Auditoría",FALSE,9,3
+Plantillas_Inventario,ID,Text,TRUE,FALSE,,UNIQUEID(),,,FALSE,"Key alias para compatibilidad",FALSE,10,3
+Plantillas_Inventario,Created_At,DateTime,FALSE,FALSE,,NOW(),,,FALSE,"Auditoría estándar",FALSE,11,3
+Plantillas_Inventario,Created_By,Text,FALSE,FALSE,,USEREMAIL(),,,FALSE,"Auditoría estándar",FALSE,12,3
+Plantillas_Inventario,Updated_At,DateTime,FALSE,FALSE,,,NOW(),,FALSE,"Auditoría estándar",FALSE,13,3
+Plantillas_Inventario,Updated_By,Text,FALSE,FALSE,,,USEREMAIL(),,FALSE,"Auditoría estándar",FALSE,14,3
+Plantillas_Inventario,Deleted?,Yes/No,FALSE,FALSE,,FALSE,,,FALSE,"Soft delete",FALSE,15,3
+Plantillas_Inventario,Sync_Pending?,Yes/No,FALSE,FALSE,,TRUE,,,FALSE,"Sync offline",FALSE,16,3
+Conteos_Inventario,Conteo_ID,Text,TRUE,FALSE,,UNIQUEID(),,,FALSE,"Clave única conteo",FALSE,1,3
+Conteos_Inventario,Plantilla_ID,Ref,FALSE,TRUE,Plantillas_Inventario,,,,,"Plantilla usada",TRUE,2,3
+Conteos_Inventario,Sucursal_ID,Ref,FALSE,TRUE,Sucursales,LOOKUP([Plantilla_ID], "Plantillas_Inventario", "Plantilla_ID", "Sucursal_ID"),FALSE,,"Sucursal del conteo (hereda de plantilla)",FALSE,3,3
+Conteos_Inventario,Iniciado_Por,Text,FALSE,FALSE,,USEREMAIL(),,,FALSE,"Quién inicia el conteo",FALSE,4,3
+Conteos_Inventario,Fecha_Inicio,DateTime,FALSE,FALSE,,NOW(),,,FALSE,"Cuándo empezó",FALSE,5,3
+Conteos_Inventario,Fecha_Fin,DateTime,FALSE,FALSE,,,,,"Fecha fin real",FALSE,6,3
+Conteos_Inventario,Estado,Enum,FALSE,FALSE,,Borrador,,,"IN([_THIS], LIST(\"Borrador\", \"En_Progreso\", \"Completado\", \"Aprobado\", \"Rechazado\", \"Con_Diferencias\", \"Anulado\"))","Estado del proceso",FALSE,7,3
+Conteos_Inventario,Observaciones,LongText,FALSE,FALSE,,,,,"Notas del encargado",TRUE,8,3
+Conteos_Inventario,Fecha_Creacion,DateTime,FALSE,FALSE,,NOW(),,,FALSE,"Auditoría",FALSE,9,3
+Conteos_Inventario,Creado_Por,Text,FALSE,FALSE,,USEREMAIL(),,,FALSE,"Auditoría",FALSE,10,3
+Conteos_Inventario,ID,Text,TRUE,FALSE,,UNIQUEID(),,,FALSE,"Key alias",FALSE,11,3
+Conteos_Inventario,Created_At,DateTime,FALSE,FALSE,,NOW(),,,FALSE,"Auditoría estándar",FALSE,12,3
+Conteos_Inventario,Created_By,Text,FALSE,FALSE,,USEREMAIL(),,,FALSE,"Auditoría estándar",FALSE,13,3
+Conteos_Inventario,Updated_At,DateTime,FALSE,FALSE,,,NOW(),,FALSE,"Auditoría estándar",FALSE,14,3
+Conteos_Inventario,Updated_By,Text,FALSE,FALSE,,,USEREMAIL(),,FALSE,"Auditoría estándar",FALSE,15,3
+Conteos_Inventario,Deleted?,Yes/No,FALSE,FALSE,,FALSE,,,FALSE,"Soft delete",FALSE,16,3
+Conteos_Inventario,Sucursal_ID,Ref,FALSE,TRUE,Sucursales,,LOOKUP([Plantilla_ID], "Plantillas_Inventario", "Plantilla_ID", "Sucursal_ID"),FALSE,"Security Filter hereda de aquí",FALSE,17,3
+Conteos_Inventario,Sync_Pending?,Yes/No,FALSE,FALSE,,TRUE,,,FALSE,"Sync offline",FALSE,18,3
+Items_Conteo,Item_ID,Text,TRUE,FALSE,,UNIQUEID(),,,FALSE,"Clave única item",FALSE,1,3
+Items_Conteo,Conteo_ID,Ref,FALSE,TRUE,Conteos_Inventario,,,,,"Conteo padre",FALSE,2,3
+Items_Conteo,Ingrediente_ID,Ref,FALSE,TRUE,Ingredientes_y_Stock,,,,,"Ingrediente contado",TRUE,3,3
+Items_Conteo,Stock_Teorico,Decimal,FALSE,FALSE,,LOOKUP([Ingrediente_ID], "Ingredientes_y_Stock", "Ingrediente_ID", "Stock_Actual"),FALSE,,">=0","Stock sistema al iniciar conteo",FALSE,4,3
+Items_Conteo,Stock_Contado,Decimal,FALSE,FALSE,,,,,">=0","Stock físico contado",TRUE,5,3
+Items_Conteo,Unidad_Medida,Text,FALSE,FALSE,,LOOKUP([Ingrediente_ID], "Ingredientes_y_Stock", "Ingrediente_ID", "Unidad_Base"),FALSE,,"Unidad (auto)",FALSE,6,3
+Items_Conteo,Diferencia,Decimal,FALSE,FALSE,,[Stock_Contado] - [Stock_Teorico],FALSE,,,"Diff = Contado - Teórico",FALSE,7,3
+Items_Conteo,Porcentaje_Diferencia,Decimal,FALSE,FALSE,,IF([Stock_Teorico]<>0, ([Diferencia]/[Stock_Teorico])*100, 0),FALSE,,,"% diferencia",FALSE,8,3
+Items_Conteo,Esta_Fuera_Tolerancia?,Yes/No,FALSE,FALSE,,ABS([Porcentaje_Diferencia]) > LOOKUP("TOLERANCIA_INVENTARIO_DEFAULT", "Config_Global", "Clave", "Valor"),FALSE,,,"TRUE = requiere revisión/ajuste",FALSE,9,3
+Items_Conteo,Tolerancia_Aplicada,Decimal,FALSE,FALSE,,LOOKUP("TOLERANCIA_INVENTARIO_DEFAULT", "Config_Global", "Clave", "Valor"),FALSE,,,"% tolerancia usada",FALSE,10,3
+Items_Conteo,Observacion_Contador,LongText,FALSE,FALSE,,,,,"Nota del operador al contar",TRUE,11,3
+Items_Conteo,Fecha_Conteo,DateTime,FALSE,FALSE,,NOW(),,,FALSE,"Cuándo se contó este item",FALSE,12,3
+Items_Conteo,Contado_Por,Text,FALSE,FALSE,,USEREMAIL(),,,FALSE,"Quién contó",FALSE,13,3
+Items_Conteo,Sync_Pending?,Yes/No,FALSE,FALSE,,TRUE,,,FALSE,"Sync offline",FALSE,14,3
+Items_Conteo,ID,Text,TRUE,FALSE,,UNIQUEID(),,,FALSE,"Key alias",FALSE,15,3
+Items_Conteo,Created_At,DateTime,FALSE,FALSE,,NOW(),,,FALSE,"Auditoría estándar",FALSE,16,3
+Items_Conteo,Created_By,Text,FALSE,FALSE,,USEREMAIL(),,,FALSE,"Auditoría estándar",FALSE,17,3
+Items_Conteo,Updated_At,DateTime,FALSE,FALSE,,,NOW(),,FALSE,"Auditoría estándar",FALSE,18,3
+Items_Conteo,Updated_By,Text,FALSE,FALSE,,,USEREMAIL(),,FALSE,"Auditoría estándar",FALSE,19,3
+Items_Conteo,Deleted?,Yes/No,FALSE,FALSE,,FALSE,,,FALSE,"Soft delete",FALSE,20,3
+Items_Conteo,Sucursal_ID,Ref,FALSE,TRUE,Sucursales,,LOOKUP([Conteo_ID], "Conteos_Inventario", "Conteo_ID", "Sucursal_ID"),FALSE,"Security Filter hereda",FALSE,21,3
+Ajustes_Inventario,Ajuste_ID,Text,TRUE,FALSE,,UNIQUEID(),,,FALSE,"Clave única ajuste",FALSE,1,3
+Ajustes_Inventario,Conteo_ID,Ref,FALSE,TRUE,Conteos_Inventario,,,,,"Conteo origen",FALSE,2,3
+Ajustes_Inventario,Item_ID,Ref,FALSE,TRUE,Items_Conteo,,,,,"Item origen",FALSE,3,3
+Ajustes_Inventario,Ingrediente_ID,Ref,FALSE,TRUE,Ingredientes_y_Stock,,,,,"Ingrediente ajustado",FALSE,4,3
+Ajustes_Inventario,Sucursal_ID,Ref,FALSE,TRUE,Sucursales,,,,,"Sucursal",FALSE,5,3
+Ajustes_Inventario,Stock_Anterior,Decimal,FALSE,FALSE,,LOOKUP([Ingrediente_ID], "Ingredientes_y_Stock", "Ingrediente_ID", "Stock_Actual"),FALSE,,">=0","Stock antes del ajuste",FALSE,6,3
+Ajustes_Inventario,Stock_Nuevo,Decimal,FALSE,FALSE,,,,,">=0","Stock después del ajuste",TRUE,7,3
+Ajustes_Inventario,Diferencia_Ajuste,Decimal,FALSE,FALSE,,[Stock_Nuevo] - [Stock_Anterior],FALSE,,,"Diff aplicada",FALSE,8,3
+Ajustes_Inventario,Tipo_Ajuste,Enum,FALSE,FALSE,,Merma_Automatica,,,"IN([_THIS], LIST(\"Merma_Automatica\", \"Ajuste_Positivo\", \"Ajuste_Negativo\", \"Correccion_Manual\"))","Tipo de movimiento",TRUE,9,3
+Ajustes_Inventario,Aprobado_Por,Text,FALSE,FALSE,,,,,"Encargad/Admin que aprueba",FALSE,10,3
+Ajustes_Inventario,Fecha_Aprobacion,DateTime,FALSE,FALSE,,,,,"Cuándo se aprobó",FALSE,11,3
+Ajustes_Inventario,Estado,Enum,FALSE,FALSE,,Pendiente,,,"IN([_THIS], LIST(\"Pendiente\", \"Aprobado\", \"Rechazado\", \"Aplicado\", \"Anulado\"))","Estado",FALSE,12,3
+Ajustes_Inventario,Genero_Merma_Auto?,Yes/No,FALSE,FALSE,,FALSE,,,,"Si TRUE crea merma auto",FALSE,13,3
+Ajustes_Inventario,Merma_ID_Generada,Text,FALSE,FALSE,,,,,"ID merma creada",FALSE,14,3
+Ajustes_Inventario,Fecha_Creacion,DateTime,FALSE,FALSE,,NOW(),,,FALSE,"Auditoría",FALSE,15,3
+Ajustes_Inventario,Creado_Por,Text,FALSE,FALSE,,USEREMAIL(),,,FALSE,"Auditoría",FALSE,16,3
+Ajustes_Inventario,ID,Text,TRUE,FALSE,,UNIQUEID(),,,FALSE,"Key alias",FALSE,17,3
+Ajustes_Inventario,Created_At,DateTime,FALSE,FALSE,,NOW(),,,FALSE,"Auditoría estándar",FALSE,18,3
+Ajustes_Inventario,Created_By,Text,FALSE,FALSE,,USEREMAIL(),,,FALSE,"Auditoría estándar",FALSE,19,3
+Ajustes_Inventario,Updated_At,DateTime,FALSE,FALSE,,,NOW(),,FALSE,"Auditoría estándar",FALSE,20,3
+Ajustes_Inventario,Updated_By,Text,FALSE,FALSE,,,USEREMAIL(),,FALSE,"Auditoría estándar",FALSE,21,3
+Ajustes_Inventario,Deleted?,Yes/No,FALSE,FALSE,,FALSE,,,FALSE,"Soft delete",FALSE,22,3
+Ajustes_Inventario,Sucursal_ID,Ref,FALSE,TRUE,Sucursales,,LOOKUP([Conteo_ID], "Conteos_Inventario", "Conteo_ID", "Sucursal_ID"),FALSE,"Security Filter hereda",FALSE,23,3
+Ajustes_Inventario,Sync_Pending?,Yes/No,FALSE,FALSE,,TRUE,,,FALSE,"Sync offline",FALSE,24,3

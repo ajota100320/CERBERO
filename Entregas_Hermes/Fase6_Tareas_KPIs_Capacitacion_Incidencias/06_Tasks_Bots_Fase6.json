@@ -1,0 +1,237 @@
+[
+  {
+    "TaskName": "Task_Notificar_Tarea_Proxima",
+    "Type": "Push Notification",
+    "Description": "Notifica a responsable que tarea programada está próxima (ventana Notificar_Antes_Min)",
+    "TableName": "Tarea_Programaciones",
+    "Condition": "AND([Es_Activa] = TRUE, OR([Responsable_Usuario_Especifico] = USEREMAIL(), IN([Responsable_Rol], LIST(\"Operador\", \"Encargado\", \"Administrador\"))), HOUR([Hora_Programada] - NOW()) * 60 + MINUTE([Hora_Programada] - NOW()) <= [Notificar_Antes_Min], HOUR([Hora_Programada] - NOW()) * 60 + MINUTE([Hora_Programada] - NOW()) > 0)",
+    "Recipients": "IF([Responsable_Usuario_Especifico] <> \"\", [Responsable_Usuario_Especifico], SELECT(Usuarios_Sucursales[Email], AND([Sucursal_ID] = [_THISROW].[Sucursal_ID], IN([Rol], LIST([Responsable_Rol])))))",
+    "Subject": "⏰ Próxima tarea: <<[Tarea_ID].[Nombre]>> (<<[Tarea_ID].[Categoria]>>)",
+    "Body": "Tienes una tarea programada en **<<[Notificar_Antes_Min]>> minutos**.\n\n**Tarea:** <<[Tarea_ID].[Nombre]>>\n**Categoría:** <<[Tarea_ID].[Categoria]>>\n**Ventana:** <<[Hora_Programada]>> - <<[Hora_Ventana_Fin]>>\n**Duración estimada:** <<[Tarea_ID].[Duracion_Estimada_Min]>> min\n**Sucursal:** <<[Sucursal_ID].[Nombre]>>\n\nAbre App → Tareas → Mis Tareas Hoy para iniciarla.",
+    "Icon": "clock",
+    "Color": "Info"
+  },
+  {
+    "TaskName": "Task_Detectar_Tareas_Vencidas",
+    "Type": "App: run a data action on a set of rows",
+    "Description": "Encuentra ejecuciones pendientes cuya ventana ya pasó (Hora_Ventana_Fin < NOW)",
+    "TableName": "Tarea_Ejecuciones",
+    "Condition": "AND([Estado] = \"Pendiente\", [Fecha_Ejecucion] = TODAY(), [Prog_ID].[Hora_Ventana_Fin] < TIME(NOW()))",
+    "ReferencedAction": "Action_Marcar_Tarea_Vencida",
+    "ReferencedTable": "Tarea_Ejecuciones"
+  },
+  {
+    "TaskName": "Action_Marcar_Tarea_Vencida",
+    "Type": "Data: set column values",
+    "Description": "Marca ejecución como Omitida automáticamente por vencimiento",
+    "TableName": "Tarea_Ejecuciones",
+    "Columns": [
+      "Estado",
+      "Observaciones",
+      "Sync_Pending?"
+    ],
+    "Values": [
+      "\"Omitida\"",
+      "CONCATENATE(\"AUTO-OMITIDA: Ventana de ejecución vencida (\", [Prog_ID].[Hora_Ventana_Fin], \") - \", NOW())",
+      "TRUE"
+    ]
+  },
+  {
+    "TaskName": "Task_Generar_Incidencia_Tarea_Omitida",
+    "Type": "App: run a data action on a set of rows",
+    "Description": "Para tareas obligatorias omitidas → genera incidencia automática",
+    "TableName": "Tarea_Ejecuciones",
+    "Condition": "AND([Estado] = \"Omitida\", [Tarea_ID].[Es_Obligatoria] = TRUE, [Incidencia_Generada?] = FALSE)",
+    "ReferencedAction": "Incidencia_Reportar_Desde_Tarea",
+    "ReferencedTable": "Incidencias"
+  },
+  {
+    "TaskName": "Task_Notificar_Incidencia_Auto_Desde_Tarea",
+    "Type": "Push Notification",
+    "Description": "Notifica a Encargado/Admin cuando tarea genera incidencia auto",
+    "TableName": "Incidencias",
+    "Condition": "[Origen_Incidencia] = \"Tarea_Ejecucion\" AND [_THISROW_BEFORE].[Inc_ID] = \"\"",
+    "Recipients": "SELECT(Usuarios_Sucursales[Email], AND([Sucursal_ID] = [_THISROW].[Sucursal_ID], IN([Rol], LIST(\"Encargado\", \"Administrador\"))))",
+    "Subject": "🤖 Incidencia AUTO generada: <<[Titulo]>>",
+    "Body": "Se generó incidencia automáticamente desde tarea omitida/fallida.\n\n**Tarea origen:** <<[Titulo]>>\n**Severidad:** <<[Severidad]>>\n**Sucursal:** <<[Sucursal_ID].[Nombre]>>\n**Reportada por:** <<[Reportada_Por]>> (auto)\n\n**Acción:** Asignar y resolver dentro de SLA (<<[SLA_Horas]>>h).",
+    "Icon": "bot",
+    "Color": "Warning"
+  },
+  {
+    "TaskName": "Task_Actualizar_KPI_Cumplimiento_Tareas",
+    "Type": "App: run a data action on a set of rows",
+    "Description": "Fuerza recálculo de KPI_004 (% Cumplimiento Tareas) tras cambios en ejecuciones",
+    "TableName": "KPI_Definiciones",
+    "Condition": "[KPI_ID] = \"KPI_004\"",
+    "ReferencedAction": "Action_Calcular_KPI_Single",
+    "ReferencedTable": "Registros_KPI"
+  },
+  {
+    "TaskName": "Task_Notificar_Nueva_Incidencia",
+    "Type": "Push Notification",
+    "Description": "Notifica a Encargado/Admin de la sucursal cuando se reporta incidencia nueva",
+    "TableName": "Incidencias",
+    "Condition": "[_THISROW].[Estado] = \"Abierta\" AND [_THISROW_BEFORE].[Estado] <> \"Abierta\"",
+    "Recipients": "SELECT(Usuarios_Sucursales[Email], AND([Sucursal_ID] = [_THISROW].[Sucursal_ID], IN([Rol], LIST(\"Encargado\", \"Administrador\"))))",
+    "Subject": "🚨 NUEVA INCIDENCIA: <<[Titulo]>> [<<[Severidad]>>]",
+    "Body": "Se ha reportado una nueva incidencia.\n\n**Título:** <<[Titulo]>>\n**Tipo:** <<[Tipo]>> | **Severidad:** <<[Severidad]>>\n**Sucursal:** <<[Sucursal_ID].[Nombre]>>\n**Reportada por:** <<[Reportada_Por]>>\n**Origen:** <<[Origen_Incidencia]>>\n**SLA:** <<[SLA_Horas]>> horas\n\n**Descripción:** <<[Descripcion]>>\n\n**Acción:** Asignar responsable → Acción \"Asignar\".",
+    "Icon": "alert-triangle",
+    "Color": "IF([Severidad] = \"Critica\", \"Danger\", IF([Severidad] = \"Alta\", \"Warning\", \"Info\"))"
+  },
+  {
+    "TaskName": "Task_Notificar_Asignacion_Incidencia",
+    "Type": "Push Notification",
+    "Description": "Notifica al responsable asignado",
+    "TableName": "Incidencias",
+    "Condition": "[_THISROW].[Asignada_A] <> \"\" AND [_THISROW_BEFORE].[Asignada_A] = \"\"",
+    "Recipients": "[Asignada_A]",
+    "Subject": "📋 INCIDENCIA ASIGNADA: <<[Titulo]>> [<<[Severidad]>>]",
+    "Body": "Se te ha asignado la incidencia **<<[Titulo]>>**.\n\n**Tipo:** <<[Tipo]>> | **Severidad:** <<[Severidad]>>\n**Sucursal:** <<[Sucursal_ID].[Nombre]>>\n**Reportada por:** <<[Reportada_Por]>> el <<FORMAT([Fecha_Reporte], \"DD/MM HH:mm\")>>\n**SLA respuesta:** <<[SLA_Horas]>>h (vence <<FORMAT([Fecha_Reporte] + [SLA_Horas]/24, \"DD/MM HH:mm\")>>)\n\n**Descripción:** <<[Descripcion]>>\n\n**Próximo paso:** Acción \"Resolver\" cuando la atiendas.",
+    "Icon": "user-check",
+    "Color": "IF([Severidad] = \"Critica\", \"Danger\", IF([Severidad] = \"Alta\", \"Warning\", \"Info\"))"
+  },
+  {
+    "TaskName": "Task_Notificar_Escalacion_Incidencia",
+    "Type": "Push Notification",
+    "Description": "Notifica a Admins cuando incidencia se escala",
+    "TableName": "Incidencias",
+    "Condition": "[_THISROW].[Estado] = \"Escalada\" AND [_THISROW_BEFORE].[Estado] <> \"Escalada\"",
+    "Recipients": "SELECT(Usuarios[Email], [Rol] = \"Administrador\")",
+    "Subject": "🔺 ESCALADA: <<[Titulo]>> [<<[Severidad]>>]",
+    "Body": "La incidencia **<<[Titulo]>>** ha sido escalada a Administración.\n\n**Severidad:** <<[Severidad]>>\n**Sucursal:** <<[Sucursal_ID].[Nombre]>>\n**Asignada a:** <<[_THISROW_BEFORE].[Asignada_A]>>\n**Tiempo en En_Proceso:** <<ROUND((NOW() - [Fecha_Asignacion]) * 24, 1)>>h\n\n**Requiere intervención administrativa inmediata.**",
+    "Icon": "arrow-up-circle",
+    "Color": "Danger"
+  },
+  {
+    "TaskName": "Task_Notificar_Resolucion_Incidencia",
+    "Type": "Push Notification",
+    "Description": "Notifica a Encargado/Admin cuando incidencia se resuelve",
+    "TableName": "Incidencias",
+    "Condition": "[_THISROW].[Estado] = \"Resuelta\" AND [_THISROW_BEFORE].[Estado] <> \"Resuelta\"",
+    "Recipients": "SELECT(Usuarios_Sucursales[Email], AND([Sucursal_ID] = [_THISROW].[Sucursal_ID], IN([Rol], LIST(\"Encargado\", \"Administrador\"))))",
+    "Subject": "✅ INCIDENCIA RESUELTA: <<[Titulo]>>",
+    "Body": "La incidencia **<<[Titulo]>>** ha sido marcada como resuelta.\n\n**Resuelta por:** <<[Asignada_A]>>\n**Tiempo respuesta:** <<[Tiempo_Respuesta_Horas]>>h\n**Tiempo resolución:** <<[Tiempo_Resolucion_Horas]>>h\n**SLA:** <<[SLA_Horas]>>h <<IF([Tiempo_Resolucion_Horas] <= [SLA_Horas], \"✅ CUMPLIDO\", \"❌ INCUMPLIDO\")>>\n\n**Solución:** <<[Solucion]>>\n\n**Próximo paso:** Acción \"Cerrar\" para validar y cerrar.",
+    "Icon": "check-circle",
+    "Color": "Success"
+  },
+  {
+    "TaskName": "Task_Verificar_SLA_Incidencias",
+    "Type": "App: run a data action on a set of rows",
+    "Description": "Cada 30 min: detecta incidencias abiertas/en_proceso que superan SLA",
+    "TableName": "Incidencias",
+    "Condition": "AND(IN([Estado], LIST(\"Abierta\", \"En_Proceso\")), (NOW() - [Fecha_Reporte]) * 24 > [SLA_Horas])",
+    "ReferencedAction": "Action_Marcar_SLA_Vencido",
+    "ReferencedTable": "Incidencias"
+  },
+  {
+    "TaskName": "Action_Marcar_SLA_Vencido",
+    "Type": "Data: set column values",
+    "Description": "Marca internamente SLA vencido (para reporte, no cambia estado)",
+    "TableName": "Incidencias",
+    "Columns": [
+      "Observaciones",
+      "Sync_Pending?"
+    ],
+    "Values": [
+      "CONCATENATE(IF(ISBLANK([Observaciones]), \"\", [Observaciones] & \" | \"), \"⚠️ SLA VENCIDO: \", ROUND((NOW() - [Fecha_Reporte]) * 24, 1), \"h > \", [SLA_Horas], \"h - \", NOW())",
+      "TRUE"
+    ]
+  },
+  {
+    "TaskName": "Task_Escalar_SLA_Vencido",
+    "Type": "Push Notification",
+    "Description": "Alerta a Admin cuando incidencia supera SLA sin resolver",
+    "TableName": "Incidencias",
+    "Condition": "AND(IN([Estado], LIST(\"Abierta\", \"En_Proceso\")), (NOW() - [Fecha_Reporte]) * 24 > [SLA_Horas], NOT(CONTAINS([Observaciones], \"SLA_ESCALADO_NOTIFICADO\")))",
+    "Recipients": "SELECT(Usuarios[Email], [Rol] = \"Administrador\")",
+    "Subject": "⏰ SLA VENCIDO: <<[Titulo]>> [<<[Severidad]>>] - <<ROUND((NOW() - [Fecha_Reporte]) * 24, 1)>>h",
+    "Body": "La incidencia **<<[Titulo]>>** ha superado su SLA de **<<[SLA_Horas]>>h**.\n\n**Tiempo actual:** <<ROUND((NOW() - [Fecha_Reporte]) * 24, 1)>>h\n**Estado:** <<[Estado]>>\n**Asignada a:** <<[Asignada_A]>>\n**Sucursal:** <<[Sucursal_ID].[Nombre]>>\n\n**Acción recomendada:** Escalar manualmente o reasignar.",
+    "Icon": "alert-triangle",
+    "Color": "Danger"
+  },
+  {
+    "TaskName": "Task_Calcular_KPIs_Diarios",
+    "Type": "App: run a data action on a set of rows",
+    "Description": "Diario 07:00 - calcula KPIs con Frecuencia_Calculo = Diaria",
+    "TableName": "KPI_Definiciones",
+    "Condition": "AND([Es_Activa] = TRUE, [Frecuencia_Calculo] = \"Diaria\")",
+    "ReferencedAction": "Action_Calcular_KPI_Single",
+    "ReferencedTable": "Registros_KPI"
+  },
+  {
+    "TaskName": "Task_Calcular_KPIs_Semanales_Lunes",
+    "Type": "App: run a data action on a set of rows",
+    "Description": "Lunes 07:00 - calcula KPIs semanales (WEEKDAY(NOW())=1)",
+    "TableName": "KPI_Definiciones",
+    "Condition": "AND([Es_Activa] = TRUE, [Frecuencia_Calculo] = \"Semanal\", WEEKDAY(NOW()) = 1)",
+    "ReferencedAction": "Action_Calcular_KPI_Single",
+    "ReferencedTable": "Registros_KPI"
+  },
+  {
+    "TaskName": "Task_Calcular_KPIs_Mensuales_Primero",
+    "Type": "App: run a data action on a set of rows",
+    "Description": "Día 1 de mes 07:00 - calcula KPIs mensuales",
+    "TableName": "KPI_Definiciones",
+    "Condition": "AND([Es_Activa] = TRUE, [Frecuencia_Calculo] = \"Mensual\", DAY(NOW()) = 1)",
+    "ReferencedAction": "Action_Calcular_KPI_Single",
+    "ReferencedTable": "Registros_KPI"
+  },
+  {
+    "TaskName": "Task_Alerta_KPI_Cambio_Estado",
+    "Type": "Push Notification",
+    "Description": "Notifica cuando KPI cambia semáforo (Verde→Amarillo→Rojo o inverso)",
+    "TableName": "Registros_KPI",
+    "Condition": "[_THISROW].[Estado_KPI] <> [_THISROW_BEFORE].[Estado_KPI]",
+    "Recipients": "SELECT(Usuarios_Sucursales[Email], AND([Sucursal_ID] = [_THISROW].[Sucursal_ID], IN([Rol], SPLIT([_THISROW].[KPI_ID].[Visible_Por_Rol], \",\"))))",
+    "Subject": "<<IF([_THISROW].[Estado_KPI] = \"Rojo\", \"🔴 CRÍTICO\", IF([_THISROW].[Estado_KPI] = \"Amarillo\", \"🟡 ATENCIÓN\", \"🟢 NORMAL\"))>>: <<[KPI_ID].[Nombre]>>",
+    "Body": "El KPI **<<[KPI_ID].[Nombre]>>** ha cambiado de estado.\n\n**Anterior:** <<[_THISROW_BEFORE].[Estado_KPI]>>\n**Actual:** <<[_THISROW].[Estado_KPI]>>\n**Valor:** <<[Valor]>> <<[KPI_ID].[Unidad_Medida]>>\n**Tendencia:** <<[Tendencia]>>\n**Sucursal:** <<[Sucursal_ID].[Nombre]>>\n\n**Umbrales:** Verde ≥ <<[_THISROW].[KPI_ID].[Umbral_Verde]>>, Amarillo ≥ <<[_THISROW].[KPI_ID].[Umbral_Amarillo]>>, Rojo ≥ <<[_THISROW].[KPI_ID].[Umbral_Rojo]>>",
+    "Icon": "IF([_THISROW].[Estado_KPI] = \"Rojo\", \"alert-triangle\", IF([_THISROW].[Estado_KPI] = \"Amarillo\", \"alert-circle\", \"check-circle\"))",
+    "Color": "[_THISROW].[Estado_KPI]"
+  },
+  {
+    "TaskName": "Task_Alerta_Capacitacion_Proxima_Vencer",
+    "Type": "Push Notification",
+    "Description": "Diario 08:00 - alerta capacitaciones que vencen en 7, 3, 1 días",
+    "TableName": "Capacitaciones_Usuarios",
+    "Condition": "AND([Estado] = \"Pendiente\", IN(TODAY() + [Fecha_Vencimiento] - TODAY(), LIST(7, 3, 1)))",
+    "Recipients": "[Usuario_ID]",
+    "Subject": "📚 Capacitación próxima a vencer: <<[Capac_ID].[Titulo]>> (<<TODAY() + [Fecha_Vencimiento] - TODAY()>> días)",
+    "Body": "Tu capacitación **<<[Capac_ID].[Titulo]>>** vence en **<<TODAY() + [Fecha_Vencimiento] - TODAY()>> días**.\n\n**Fecha límite:** <<FORMAT([Fecha_Vencimiento], \"DD/MM/YYYY\")>>\n**Duración:** <<[Capac_ID].[Duracion_Min]>> min\n**Modalidad:** <<[Capac_ID].[Tipo]>>\n**Contenido:** <<[Capac_ID].[Contenido_URL]>>\n\n**Acción:** Accede y complétala antes de la fecha límite.",
+    "Icon": "book-open",
+    "Color": "IF(TODAY() + [Fecha_Vencimiento] - TODAY() <= 1, \"Danger\", \"Warning\")"
+  },
+  {
+    "TaskName": "Task_Marcar_Capacitacion_Vencida",
+    "Type": "Data: set column values",
+    "Description": "Diario - marca como Vencida las capacitaciones pasadas de fecha",
+    "TableName": "Capacitaciones_Usuarios",
+    "Condition": "AND([Estado] = \"Pendiente\", [Fecha_Vencimiento] < TODAY())",
+    "Columns": [
+      "Estado",
+      "Observaciones",
+      "Sync_Pending?"
+    ],
+    "Values": [
+      "\"Vencida\"",
+      "CONCATENATE(IF(ISBLANK([Observaciones]), \"\", [Observaciones] & \" | \"), \"AUTO-VENCIDA: Fecha límite superada - \", NOW())",
+      "TRUE"
+    ]
+  },
+  {
+    "TaskName": "Task_Renovar_Capacitacion_Completada",
+    "Type": "Data: add a new row to a table",
+    "Description": "Al completar capacitación recurrente (Es_Recurrente=TRUE), crea la siguiente asignación automáticamente",
+    "TableName": "Capacitaciones_Usuarios",
+    "Condition": "AND([_THISROW].[Estado] = \"Completada\", [_THISROW_BEFORE].[Estado] <> \"Completada\", [_THISROW].[Es_Recurrente?] = TRUE, [_THISROW].[Capac_ID].[Estado] = \"Aprobada\")",
+    "InitialValues": {
+      "Capac_ID": "[_THISROW].[Capac_ID]",
+      "Usuario_ID": "[_THISROW].[Usuario_ID]",
+      "Sucursal_ID": "[_THISROW].[Sucursal_ID]",
+      "Estado": "\"Pendiente\"",
+      "Fecha_Asignacion": "TODAY()",
+      "Fecha_Vencimiento": "TODAY() + [_THISROW].[Capac_ID].[Frecuencia_Renovacion_Meses] * 30",
+      "Es_Recurrente?": "TRUE",
+      "Sync_Pending?": "TRUE"
+    }
+  }
+]

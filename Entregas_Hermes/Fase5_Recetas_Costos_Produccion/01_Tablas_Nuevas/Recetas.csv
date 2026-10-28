@@ -1,0 +1,4 @@
+Receta_ID,Nombre,Categoria,Descripcion,Rendimiento_Porciones,Unidad_Rendimiento,Tiempo_Preparacion_Min,Tiempo_Coccion_Min,Dificultad,Version,Estado,Aprobada_Por,Fecha_Aprobacion,Costo_Total_Receta,Costo_Por_Porciona,Es_Activa,Sucursal_ID,Fecha_Creacion,Creado_Por,Sync_Pending?
+REC_001,"Hamburguesa Clásica","Principales","Carne, lechuga, tomate, queso, pan",10,"Porciones",15,10,"Media",1,"Aprobada","admin@test.com",NOW(),150.00,15.00,TRUE,[Sucursal_ID_Suc1],NOW(),USEREMAIL(),TRUE
+REC_002,"Papas Fritas","Guarniciones","Papa, aceite, sal",20,"Porciones",5,8,"Baja",1,"Borrador",,,0,0,TRUE,[Sucursal_ID_Suc1],NOW(),USEREMAIL(),TRUE
+REC_003,"Hamburguesa Clásica Suc 2","Principales","Versión Sucursal 2",10,"Porciones",15,10,"Media",1,"Aprobada","admin@test.com",NOW(),155.00,15.50,TRUE,[Sucursal_ID_Suc2],NOW(),USEREMAIL(),TRUE

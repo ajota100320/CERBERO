@@ -1,0 +1,178 @@
+Tabla_Objetivo,Nombre_Columna,Tipo_Dato,Es_Key?,Es_Ref?,Ref_Table,Initial_Value,App_Formula,Show_If,Valid_If,Descripcion,Editable_En_Formulario?,Orden,Fase
+Tareas,Tarea_ID,Text,TRUE,FALSE,,UNIQUEID(),,,FALSE,"Clave única tarea",FALSE,1,6
+Tareas,Nombre,Text,FALSE,FALSE,,,,,"LEN([_THIS]) >= 3","Nombre visible",TRUE,2,6
+Tareas,Categoria,Enum,FALSE,FALSE,,Operaciones,,,"IN([_THIS], LIST(\"Operaciones\", \"Producción\", \"Inventario\", \"Mantenimiento\", \"Limpieza\", \"Seguridad\", \"Otros\"))","Categoría",TRUE,3,6
+Tareas,Descripcion,LongText,FALSE,FALSE,,,,,"Descripción tarea",TRUE,4,6
+Tareas,Es_Recurrente,Yes/No,FALSE,FALSE,,TRUE,,,,"¿Tiene programación recurrente?",TRUE,5,6
+Tareas,Duracion_Estimada_Min,Number,FALSE,FALSE,,,,,">0","Duración estimada minutos",TRUE,6,6
+Tareas,Es_Obligatoria,Yes/No,FALSE,FALSE,,TRUE,,,,"¿Obligatoria para cumplimiento?",TRUE,7,6
+Tareas,Checklist_JSON,LongText,FALSE,FALSE,,,,,"JSON array checklist items",TRUE,8,6
+Tareas,Es_Activa,Yes/No,FALSE,FALSE,,TRUE,,,,"Tarea disponible para programación",TRUE,9,6
+Tareas,Sucursal_ID,Ref,FALSE,TRUE,Sucursales,LOOKUP(USEREMAIL(), "Usuarios_Sucursales", "Email", "Sucursal_ID"),FALSE,"IN([_THIS], SELECT(Sucursales[Sucursal_ID], [Activa?]=TRUE))","Sucursal propietaria",FALSE,10,6
+Tareas,Fecha_Creacion,DateTime,FALSE,FALSE,,NOW(),,,FALSE,"Auditoría",FALSE,11,6
+Tareas,Creado_Por,Text,FALSE,FALSE,,USEREMAIL(),,,FALSE,"Auditoría",FALSE,12,6
+Tareas,ID,Text,TRUE,FALSE,,UNIQUEID(),,,FALSE,"Key alias",FALSE,13,6
+Tareas,Created_At,DateTime,FALSE,FALSE,,NOW(),,,FALSE,"Auditoría estándar",FALSE,14,6
+Tareas,Created_By,Text,FALSE,FALSE,,USEREMAIL(),,,FALSE,"Auditoría estándar",FALSE,15,6
+Tareas,Updated_At,DateTime,FALSE,FALSE,,,NOW(),,FALSE,"Auditoría estándar",FALSE,16,6
+Tareas,Updated_By,Text,FALSE,FALSE,,,USEREMAIL(),,FALSE,"Auditoría estándar",FALSE,17,6
+Tareas,Deleted?,Yes/No,FALSE,FALSE,,FALSE,,,FALSE,"Soft delete",FALSE,18,6
+Tareas,Sync_Pending?,Yes/No,FALSE,FALSE,,TRUE,,,FALSE,"Sync offline",FALSE,19,6
+Tarea_Programaciones,Prog_ID,Text,TRUE,FALSE,,UNIQUEID(),,,FALSE,"Clave única programación",FALSE,1,6
+Tarea_Programaciones,Tarea_ID,Ref,FALSE,TRUE,Tareas,,,,,"Tarea programada",TRUE,2,6
+Tarea_Programaciones,Sucursal_ID,Ref,FALSE,TRUE,Sucursales,LOOKUP([Tarea_ID], "Tareas", "Tarea_ID", "Sucursal_ID"),FALSE,,"Sucursal (hereda de tarea)",FALSE,3,6
+Tarea_Programaciones,Frecuencia,Enum,FALSE,FALSE,,Diaria,,,"IN([_THIS], LIST(\"Diaria\", \"Semanal\", \"Quincenal\", \"Mensual\", \"Personalizada\"))","Frecuencia recurrencia",TRUE,4,6
+Tarea_Programaciones,Dias_Semana,Text,FALSE,FALSE,,1,2,3,4,5,6,7,,,"Días semana (1=Lun..7=Dom) CSV",TRUE,5,6
+Tarea_Programaciones,Hora_Programada,Time,FALSE,FALSE,,,,,"Hora inicio ventana",TRUE,6,6
+Tarea_Programaciones,Hora_Ventana_Fin,Time,FALSE,FALSE,,,,,"Hora fin ventana (máx para completarse)",TRUE,7,6
+Tarea_Programaciones,Responsable_Rol,Enum,FALSE,FALSE,,Operador,,,"IN([_THIS], LIST(\"Operador\", \"Encargado\", \"Administrador\"))","Rol responsable",TRUE,8,6
+Tarea_Programaciones,Responsable_Usuario_Especifico,Text,FALSE,FALSE,,,,,"Usuario específico (opcional, overrides rol)",TRUE,9,6
+Tarea_Programaciones,Es_Activa,Yes/No,FALSE,FALSE,,TRUE,,,,"Programación activa",TRUE,10,6
+Tarea_Programaciones,Aplica_Festivos,Yes/No,FALSE,FALSE,,FALSE,,,,"¿Ejecutar en festivos?",TRUE,11,6
+Tarea_Programaciones,Notificar_Antes_Min,Number,FALSE,FALSE,,15,,,">=0","Minutos antes para notificar",TRUE,12,6
+Tarea_Programaciones,Fecha_Creacion,DateTime,FALSE,FALSE,,NOW(),,,FALSE,"Auditoría",FALSE,13,6
+Tarea_Programaciones,Creado_Por,Text,FALSE,FALSE,,USEREMAIL(),,,FALSE,"Auditoría",FALSE,14,6
+Tarea_Programaciones,ID,Text,TRUE,FALSE,,UNIQUEID(),,,FALSE,"Key alias",FALSE,15,6
+Tarea_Programaciones,Created_At,DateTime,FALSE,FALSE,,NOW(),,,FALSE,"Auditoría estándar",FALSE,16,6
+Tarea_Programaciones,Created_By,Text,FALSE,FALSE,,USEREMAIL(),,,FALSE,"Auditoría estándar",FALSE,17,6
+Tarea_Programaciones,Updated_At,DateTime,FALSE,FALSE,,,NOW(),,FALSE,"Auditoría estándar",FALSE,18,6
+Tarea_Programaciones,Updated_By,Text,FALSE,FALSE,,,USEREMAIL(),,FALSE,"Auditoría estándar",FALSE,19,6
+Tarea_Programaciones,Deleted?,Yes/No,FALSE,FALSE,,FALSE,,,FALSE,"Soft delete",FALSE,20,6
+Tarea_Programaciones,Sync_Pending?,Yes/No,FALSE,FALSE,,TRUE,,,FALSE,"Sync offline",FALSE,21,6
+Tarea_Ejecuciones,Ejec_ID,Text,TRUE,FALSE,,UNIQUEID(),,,FALSE,"Clave única ejecución",FALSE,1,6
+Tarea_Ejecuciones,Prog_ID,Ref,FALSE,TRUE,Tarea_Programaciones,,,,,"Programación origen",FALSE,2,6
+Tarea_Ejecuciones,Tarea_ID,Ref,FALSE,TRUE,Tareas,,LOOKUP([Prog_ID], "Tarea_Programaciones", "Prog_ID", "Tarea_ID"),FALSE,,"Tarea ejecutada",FALSE,3,6
+Tarea_Ejecuciones,Sucursal_ID,Ref,FALSE,TRUE,Sucursales,LOOKUP([Prog_ID], "Tarea_Programaciones", "Prog_ID", "Sucursal_ID"),FALSE,,"Sucursal (hereda)",FALSE,4,6
+Tarea_Ejecuciones,Ejecutada_Por,Text,FALSE,FALSE,,USEREMAIL(),,,FALSE,"Quién ejecuta",FALSE,5,6
+Tarea_Ejecuciones,Fecha_Ejecucion,Date,FALSE,FALSE,,TODAY(),,,FALSE,"Fecha ejecución",TRUE,6,6
+Tarea_Ejecuciones,Hora_Inicio,Time,FALSE,FALSE,,NOW(),,,FALSE,"Hora inicio real",TRUE,7,6
+Tarea_Ejecuciones,Hora_Fin,Time,FALSE,FALSE,,,,,"Hora fin real",TRUE,8,6
+Tarea_Ejecuciones,Duracion_Real_Min,Number,FALSE,FALSE,,[Hora_Fin] - [Hora_Inicio],FALSE,,,">=0","Duración real minutos",FALSE,9,6
+Tarea_Ejecuciones,Estado,Enum,FALSE,FALSE,,Pendiente,,,"IN([_THIS], LIST(\"Pendiente\", \"En_Proceso\", \"Completada\", \"Omitida\", \"Con_Incidencia\"))","Estado ejecución",FALSE,10,6
+Tarea_Ejecuciones,Checklist_Respuestas_JSON,LongText,FALSE,FALSE,,,,,"Respuestas checklist JSON",TRUE,11,6
+Tarea_Ejecuciones,Evidencia_Fotos,Image,FALSE,FALSE,,,,,"Fotos evidencia",TRUE,12,6
+Tarea_Ejecuciones,Observaciones,LongText,FALSE,FALSE,,,,,"Observaciones ejecución",TRUE,13,6
+Tarea_Ejecuciones,Incidencia_Generada?,Yes/No,FALSE,FALSE,,FALSE,,,,"¿Generó incidencia?",FALSE,14,6
+Tarea_Ejecuciones,Incidencia_ID,Ref,FALSE,TRUE,Incidencias,,,,,"Incidencia generada",FALSE,15,6
+Tarea_Ejecuciones,Fecha_Creacion,DateTime,FALSE,FALSE,,NOW(),,,FALSE,"Auditoría",FALSE,16,6
+Tarea_Ejecuciones,Creado_Por,Text,FALSE,FALSE,,USEREMAIL(),,,FALSE,"Auditoría",FALSE,17,6
+Tarea_Ejecuciones,ID,Text,TRUE,FALSE,,UNIQUEID(),,,FALSE,"Key alias",FALSE,18,6
+Tarea_Ejecuciones,Created_At,DateTime,FALSE,FALSE,,NOW(),,,FALSE,"Auditoría estándar",FALSE,19,6
+Tarea_Ejecuciones,Created_By,Text,FALSE,FALSE,,USEREMAIL(),,,FALSE,"Auditoría estándar",FALSE,20,6
+Tarea_Ejecuciones,Updated_At,DateTime,FALSE,FALSE,,,NOW(),,FALSE,"Auditoría estándar",FALSE,21,6
+Tarea_Ejecuciones,Updated_By,Text,FALSE,FALSE,,,USEREMAIL(),,FALSE,"Auditoría estándar",FALSE,22,6
+Tarea_Ejecuciones,Deleted?,Yes/No,FALSE,FALSE,,FALSE,,,FALSE,"Soft delete",FALSE,23,6
+Tarea_Ejecuciones,Sync_Pending?,Yes/No,FALSE,FALSE,,TRUE,,,FALSE,"Sync offline",FALSE,24,6
+KPI_Definiciones,KPI_ID,Text,TRUE,FALSE,,UNIQUEID(),,,FALSE,"Clave única KPI",FALSE,1,6
+KPI_Definiciones,Nombre,Text,FALSE,FALSE,,,,,"LEN([_THIS]) >= 3","Nombre KPI",TRUE,2,6
+KPI_Definiciones,Categoria,Enum,FALSE,FALSE,,Ventas,,,"IN([_THIS], LIST(\"Ventas\", \"Costos\", \"Inventario\", \"Operaciones\", \"Calidad\", \"RRHH\", \"Producción\"))","Categoría",TRUE,3,6
+KPI_Definiciones,Descripcion,LongText,FALSE,FALSE,,,,,"Descripción",TRUE,4,6
+KPI_Definiciones,Formula_AppSheet,LongText,FALSE,FALSE,,,,,"Fórmula AppSheet para cálculo",TRUE,5,6
+KPI_Definiciones,Unidad_Medida,Text,FALSE,FALSE,,,,,"Unidad (€, %, Días, Horas, Conteo)",TRUE,6,6
+KPI_Definiciones,Frecuencia_Calculo,Enum,FALSE,FALSE,,Diaria,,,"IN([_THIS], LIST(\"Diaria\", \"Semanal\", \"Quincenal\", \"Mensual\"))","Frecuencia cálculo",TRUE,7,6
+KPI_Definiciones,Sentido_Bueno,Enum,FALSE,FALSE,,Mayor,,,"IN([_THIS], LIST(\"Mayor\", \"Menor\", \"Rango\"))","Sentido bueno",TRUE,8,6
+KPI_Definiciones,Umbral_Verde,Decimal,FALSE,FALSE,,,,,">=0","Umbral verde (bueno)",TRUE,9,6
+KPI_Definiciones,Umbral_Amarillo,Decimal,FALSE,FALSE,,,,,">=0","Umbral amarillo (atención)",TRUE,10,6
+KPI_Definiciones,Umbral_Rojo,Decimal,FALSE,FALSE,,,,,">=0","Umbral rojo (crítico)",TRUE,11,6
+KPI_Definiciones,Responsable_Rol,Enum,FALSE,FALSE,,Encargado,,,"IN([_THIS], LIST(\"Operador\", \"Encargado\", \"Administrador\"))","Rol responsable",TRUE,12,6
+KPI_Definiciones,Sucursal_ID,Ref,FALSE,TRUE,Sucursales,,,,,"Sucursal (None = global)",TRUE,13,6
+KPI_Definiciones,Es_Activa,Yes/No,FALSE,FALSE,,TRUE,,,,"KPI activo",TRUE,14,6
+KPI_Definiciones,Visible_Por_Rol,Text,FALSE,FALSE,,Administrador,Encargado,,,"Roles que ven este KPI (CSV)",TRUE,15,6
+KPI_Definiciones,Fecha_Creacion,DateTime,FALSE,FALSE,,NOW(),,,FALSE,"Auditoría",FALSE,16,6
+KPI_Definiciones,Creado_Por,Text,FALSE,FALSE,,USEREMAIL(),,,FALSE,"Auditoría",FALSE,17,6
+KPI_Definiciones,ID,Text,TRUE,FALSE,,UNIQUEID(),,,FALSE,"Key alias",FALSE,18,6
+KPI_Definiciones,Created_At,DateTime,FALSE,FALSE,,NOW(),,,FALSE,"Auditoría estándar",FALSE,19,6
+KPI_Definiciones,Created_By,Text,FALSE,FALSE,,USEREMAIL(),,,FALSE,"Auditoría estándar",FALSE,20,6
+KPI_Definiciones,Updated_At,DateTime,FALSE,FALSE,,,NOW(),,FALSE,"Auditoría estándar",FALSE,21,6
+KPI_Definiciones,Updated_By,Text,FALSE,FALSE,,,USEREMAIL(),,FALSE,"Auditoría estándar",FALSE,22,6
+KPI_Definiciones,Deleted?,Yes/No,FALSE,FALSE,,FALSE,,,FALSE,"Soft delete",FALSE,23,6
+KPI_Definiciones,Sync_Pending?,Yes/No,FALSE,FALSE,,TRUE,,,FALSE,"Sync offline",FALSE,24,6
+Registros_KPI,Registro_ID,Text,TRUE,FALSE,,UNIQUEID(),,,FALSE,"Clave única registro",FALSE,1,6
+Registros_KPI,KPI_ID,Ref,FALSE,TRUE,KPI_Definiciones,,,,,"KPI calculado",FALSE,2,6
+Registros_KPI,Sucursal_ID,Ref,FALSE,TRUE,Sucursales,LOOKUP([KPI_ID], "KPI_Definiciones", "KPI_ID", "Sucursal_ID"),FALSE,,"Sucursal (hereda)",FALSE,3,6
+Registros_KPI,Periodo_Inicio,Date,FALSE,FALSE,,,,,"Inicio período",TRUE,4,6
+Registros_KPI,Periodo_Fin,Date,FALSE,FALSE,,,,,"Fin período",TRUE,5,6
+Registros_KPI,Valor,Decimal,FALSE,FALSE,,,,,"Valor calculado",FALSE,6,6
+Registros_KPI,Estado_KPI,Enum,FALSE,FALSE,,Verde,,,"IN([_THIS], LIST(\"Verde\", \"Amarillo\", \"Rojo\"))","Estado semáforo",FALSE,7,6
+Registros_KPI,Tendencia,Enum,FALSE,FALSE,,Estable,,,"IN([_THIS], LIST(\"Mejorando\", \"Empeorando\", \"Estable\"))","Tendencia vs anterior",FALSE,8,6
+Registros_KPI,Fecha_Calculo,DateTime,FALSE,FALSE,,NOW(),,,FALSE,"Cuándo calculado",FALSE,9,6
+Registros_KPI,Calculado_Por,Text,FALSE,FALSE,,USEREMAIL(),,,FALSE,"Quién calculó (bot)",FALSE,10,6
+Registros_KPI,Sync_Pending?,Yes/No,FALSE,FALSE,,TRUE,,,FALSE,"Sync offline",FALSE,11,6
+Registros_KPI,ID,Text,TRUE,FALSE,,UNIQUEID(),,,FALSE,"Key alias",FALSE,12,6
+Registros_KPI,Created_At,DateTime,FALSE,FALSE,,NOW(),,,FALSE,"Auditoría estándar",FALSE,13,6
+Registros_KPI,Created_By,Text,FALSE,FALSE,,USEREMAIL(),,,FALSE,"Auditoría estándar",FALSE,14,6
+Registros_KPI,Updated_At,DateTime,FALSE,FALSE,,,NOW(),,FALSE,"Auditoría estándar",FALSE,15,6
+Registros_KPI,Updated_By,Text,FALSE,FALSE,,,USEREMAIL(),,FALSE,"Auditoría estándar",FALSE,16,6
+Registros_KPI,Deleted?,Yes/No,FALSE,FALSE,,FALSE,,,FALSE,"Soft delete",FALSE,17,6
+Capacitaciones,Capac_ID,Text,TRUE,FALSE,,UNIQUEID(),,,FALSE,"Clave única capacitación",FALSE,1,6
+Capacitaciones,Titulo,Text,FALSE,FALSE,,,,,"LEN([_THIS]) >= 3","Título",TRUE,2,6
+Capacitaciones,Categoria,Enum,FALSE,FALSE,,Seguridad,,,"IN([_THIS], LIST(\"Seguridad\", \"Operaciones\", \"Costos\", \"Tecnología\", \"Servicio\", \"RRHH\"))","Categoría",TRUE,3,6
+Capacitaciones,Descripcion,LongText,FALSE,FALSE,,,,,"Descripción",TRUE,4,6
+Capacitaciones,Contenido_URL,Text,FALSE,FALSE,,,,,"URL contenido (Drive, YouTube, PDF)",TRUE,5,6
+Capacitaciones,Duracion_Min,Number,FALSE,FALSE,,,,,">0","Duración minutos",TRUE,6,6
+Capacitaciones,Tipo,Enum,FALSE,FALSE,,Online,,,"IN([_THIS], LIST(\"Online\", \"Presencial\", \"Hibrida\"))","Modalidad",TRUE,7,6
+Capacitaciones,Version,Number,FALSE,FALSE,,1,,,">=1","Versión contenido",TRUE,8,6
+Capacitaciones,Estado,Enum,FALSE,FALSE,,Borrador,,,"IN([_THIS], LIST(\"Borrador\", \"En_Revision\", \"Aprobada\", \"Obsoleta\"))","Estado",FALSE,9,6
+Capacitaciones,Aprobada_Por,Text,FALSE,FALSE,,,,,FALSE,"Quién aprobó",FALSE,10,6
+Capacitaciones,Fecha_Aprobacion,DateTime,FALSE,FALSE,,,,,FALSE,"Cuándo aprobó",FALSE,11,6
+Capacitaciones,Es_Obligatoria,Yes/No,FALSE,FALSE,,TRUE,,,,"¿Obligatoria para roles?",TRUE,12,6
+Capacitaciones,Frecuencia_Renovacion_Meses,Number,FALSE,FALSE,,12,,,">0","Meses para renovar",TRUE,13,6
+Capacitaciones,Sucursal_ID,Ref,FALSE,TRUE,Sucursales,LOOKUP(USEREMAIL(), "Usuarios_Sucursales", "Email", "Sucursal_ID"),FALSE,"IN([_THIS], SELECT(Sucursales[Sucursal_ID], [Activa?]=TRUE))","Sucursal",FALSE,14,6
+Capacitaciones,Fecha_Creacion,DateTime,FALSE,FALSE,,NOW(),,,FALSE,"Auditoría",FALSE,15,6
+Capacitaciones,Creado_Por,Text,FALSE,FALSE,,USEREMAIL(),,,FALSE,"Auditoría",FALSE,16,6
+Capacitaciones,ID,Text,TRUE,FALSE,,UNIQUEID(),,,FALSE,"Key alias",FALSE,17,6
+Capacitaciones,Created_At,DateTime,FALSE,FALSE,,NOW(),,,FALSE,"Auditoría estándar",FALSE,18,6
+Capacitaciones,Created_By,Text,FALSE,FALSE,,USEREMAIL(),,,FALSE,"Auditoría estándar",FALSE,19,6
+Capacitaciones,Updated_At,DateTime,FALSE,FALSE,,,NOW(),,FALSE,"Auditoría estándar",FALSE,20,6
+Capacitaciones,Updated_By,Text,FALSE,FALSE,,,USEREMAIL(),,FALSE,"Auditoría estándar",FALSE,21,6
+Capacitaciones,Deleted?,Yes/No,FALSE,FALSE,,FALSE,,,FALSE,"Soft delete",FALSE,22,6
+Capacitaciones,Sync_Pending?,Yes/No,FALSE,FALSE,,TRUE,,,FALSE,"Sync offline",FALSE,23,6
+Capacitaciones_Usuarios,Cap_Usu_ID,Text,TRUE,FALSE,,UNIQUEID(),,,FALSE,"Clave única asignación",FALSE,1,6
+Capacitaciones_Usuarios,Capac_ID,Ref,FALSE,TRUE,Capacitaciones,,,,,"Capacitación",FALSE,2,6
+Capacitaciones_Usuarios,Usuario_ID,Text,FALSE,FALSE,,USEREMAIL(),,,FALSE,"Usuario asignado",TRUE,3,6
+Capacitaciones_Usuarios,Sucursal_ID,Ref,FALSE,TRUE,Sucursales,LOOKUP([Capac_ID], "Capacitaciones", "Capac_ID", "Sucursal_ID"),FALSE,,"Sucursal (hereda)",FALSE,4,6
+Capacitaciones_Usuarios,Estado,Enum,FALSE,FALSE,,Pendiente,,,"IN([_THIS], LIST(\"Pendiente\", \"En_Progreso\", \"Completada\", \"Vencida\", \"Eximida\"))","Estado asignación",FALSE,5,6
+Capacitaciones_Usuarios,Fecha_Asignacion,Date,FALSE,FALSE,,TODAY(),,,FALSE,"Cuándo asignada",TRUE,6,6
+Capacitaciones_Usuarios,Fecha_Vencimiento,Date,FALSE,FALSE,,[Fecha_Asignacion] + [Capac_ID].[Frecuencia_Renovacion_Meses] * 30,FALSE,,,"Fecha límite",FALSE,7,6
+Capacitaciones_Usuarios,Fecha_Completado,Date,FALSE,FALSE,,,,,"Cuándo completada",TRUE,8,6
+Capacitaciones_Usuarios,Puntuacion_Examen,Number,FALSE,FALSE,,,,,">=0","Puntuación si hay examen",TRUE,9,6
+Capacitaciones_Usuarios,Observaciones,LongText,FALSE,FALSE,,,,,"Observaciones",TRUE,10,6
+Capacitaciones_Usuarios,Es_Recurrente?,Yes/No,FALSE,FALSE,,TRUE,,,,"¿Se renueva automáticamente?",TRUE,11,6
+Capacitaciones_Usuarios,Fecha_Proxima_Renovacion,Date,FALSE,FALSE,,[Fecha_Completado] + [Capac_ID].[Frecuencia_Renovacion_Meses] * 30,FALSE,,,"Próxima renovación",FALSE,12,6
+Capacitaciones_Usuarios,Fecha_Creacion,DateTime,FALSE,FALSE,,NOW(),,,FALSE,"Auditoría",FALSE,13,6
+Capacitaciones_Usuarios,Creado_Por,Text,FALSE,FALSE,,USEREMAIL(),,,FALSE,"Auditoría",FALSE,14,6
+Capacitaciones_Usuarios,ID,Text,TRUE,FALSE,,UNIQUEID(),,,FALSE,"Key alias",FALSE,15,6
+Capacitaciones_Usuarios,Created_At,DateTime,FALSE,FALSE,,NOW(),,,FALSE,"Auditoría estándar",FALSE,16,6
+Capacitaciones_Usuarios,Created_By,Text,FALSE,FALSE,,USEREMAIL(),,,FALSE,"Auditoría estándar",FALSE,17,6
+Capacitaciones_Usuarios,Updated_At,DateTime,FALSE,FALSE,,,NOW(),,FALSE,"Auditoría estándar",FALSE,18,6
+Capacitaciones_Usuarios,Updated_By,Text,FALSE,FALSE,,,USEREMAIL(),,FALSE,"Auditoría estándar",FALSE,19,6
+Capacitaciones_Usuarios,Deleted?,Yes/No,FALSE,FALSE,,FALSE,,,FALSE,"Soft delete",FALSE,20,6
+Capacitaciones_Usuarios,Sync_Pending?,Yes/No,FALSE,FALSE,,TRUE,,,FALSE,"Sync offline",FALSE,21,6
+Incidencias,Inc_ID,Text,TRUE,FALSE,,UNIQUEID(),,,FALSE,"Clave única incidencia",FALSE,1,6
+Incidencias,Titulo,Text,FALSE,FALSE,,,,,"LEN([_THIS]) >= 5","Título incidencia",TRUE,2,6
+Incidencias,Tipo,Enum,FALSE,FALSE,,Mantenimiento,,,"IN([_THIS], LIST(\"Mantenimiento\", \"Servicio\", \"Seguridad\", \"Inventario\", \"Producción\", \"RRHH\", \"Tecnología\", \"Otros\"))","Tipo",TRUE,3,6
+Incidencias,Severidad,Enum,FALSE,FALSE,,Media,,,"IN([_THIS], LIST(\"Baja\", \"Media\", \"Alta\", \"Critica\"))","Severidad",TRUE,4,6
+Incidencias,Descripcion,LongText,FALSE,FALSE,,,,,"Descripción detallada",TRUE,5,6
+Incidencias,Sucursal_ID,Ref,FALSE,TRUE,Sucursales,LOOKUP(USEREMAIL(), "Usuarios_Sucursales", "Email", "Sucursal_ID"),FALSE,"IN([_THIS], SELECT(Sucursales[Sucursal_ID], [Activa?]=TRUE))","Sucursal",TRUE,6,6
+Incidencias,Reportada_Por,Text,FALSE,FALSE,,USEREMAIL(),,,FALSE,"Quién reporta",FALSE,7,6
+Incidencias,Asignada_A,Text,FALSE,FALSE,,,,,"A quién asignada",TRUE,8,6
+Incidencias,Fecha_Reporte,DateTime,FALSE,FALSE,,NOW(),,,FALSE,"Cuándo reportada",FALSE,9,6
+Incidencias,Fecha_Asignacion,DateTime,FALSE,FALSE,,,,,"Cuándo asignada",TRUE,10,6
+Incidencias,Fecha_Cierre,DateTime,FALSE,FALSE,,,,,"Cuándo cerrada",TRUE,11,6
+Incidencias,Estado,Enum,FALSE,FALSE,,Abierta,,,"IN([_THIS], LIST(\"Abierta\", \"En_Proceso\", \"Escalada\", \"Resuelta\", \"Cerrada\", \"Cancelada\"))","Estado",FALSE,12,6
+Incidencias,SLA_Horas,Number,FALSE,FALSE,,4,,,">0","SLA horas según severidad",TRUE,13,6
+Incidencias,Tiempo_Respuesta_Horas,Decimal,FALSE,FALSE,,[Fecha_Asignacion] - [Fecha_Reporte],FALSE,,,">=0","Horas primera respuesta",FALSE,14,6
+Incidencias,Tiempo_Resolucion_Horas,Decimal,FALSE,FALSE,,[Fecha_Cierre] - [Fecha_Reporte],FALSE,,,">=0","Horas resolución total",FALSE,15,6
+Incidencias,Solucion,LongText,FALSE,FALSE,,,,,"Solución aplicada",TRUE,16,6
+Incidencias,Incidencia_Relacionada_ID,Ref,FALSE,TRUE,Incidencias,,,,,"Incidencia relacionada/padre",TRUE,17,6
+Incidencias,Origen_Incidencia,Enum,FALSE,FALSE,,Tarea_Ejecucion,,,"IN([_THIS], LIST(\"Tarea_Ejecucion\", \"Produccion\", \"Mermas\", \"Inventario\", \"Transferencia\", \"Manual\", \"Cliente\"))","Origen detección",TRUE,18,6
+Incidencias,Evidencia_Inicial,Image,FALSE,FALSE,,,,,"Foto/video inicial",TRUE,19,6
+Incidencias,Fecha_Creacion,DateTime,FALSE,FALSE,,NOW(),,,FALSE,"Auditoría",FALSE,20,6
+Incidencias,Creado_Por,Text,FALSE,FALSE,,USEREMAIL(),,,FALSE,"Auditoría",FALSE,21,6
+Incidencias,ID,Text,TRUE,FALSE,,UNIQUEID(),,,FALSE,"Key alias",FALSE,22,6
+Incidencias,Created_At,DateTime,FALSE,FALSE,,NOW(),,,FALSE,"Auditoría estándar",FALSE,23,6
+Incidencias,Created_By,Text,FALSE,FALSE,,USEREMAIL(),,,FALSE,"Auditoría estándar",FALSE,24,6
+Incidencias,Updated_At,DateTime,FALSE,FALSE,,,NOW(),,FALSE,"Auditoría estándar",FALSE,25,6
+Incidencias,Updated_By,Text,FALSE,FALSE,,,USEREMAIL(),,FALSE,"Auditoría estándar",FALSE,26,6
+Incidencias,Deleted?,Yes/No,FALSE,FALSE,,FALSE,,,FALSE,"Soft delete",FALSE,27,6
+Incidencias,Sync_Pending?,Yes/No,FALSE,FALSE,,TRUE,,,FALSE,"Sync offline",FALSE,28,6

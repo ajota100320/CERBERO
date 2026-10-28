@@ -1,0 +1,3 @@
+Conteo_ID,Plantilla_ID,Sucursal_ID,Iniciado_Por,Fecha_Inicio,Fecha_Fin,Estado,Observaciones,Fecha_Creacion,Creado_Por,Sync_Pending?
+CNT_001,PLT_001,[Sucursal_ID_Suc1],"encargado1@test.com",NOW(),,"Borrador","Conteo apertura día 1",NOW(),USEREMAIL(),TRUE
+CNT_002,PLT_005,[Sucursal_ID_Suc2],"encargado2@test.com",NOW(),,"Borrador","Conteo apertura día 1 Suc 2",NOW(),USEREMAIL(),TRUE

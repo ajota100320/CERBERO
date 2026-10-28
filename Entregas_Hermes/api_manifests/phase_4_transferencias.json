@@ -1,0 +1,71 @@
+{
+  "phase": 4,
+  "name": "Transferencias entre Sucursales",
+  "description": "Órdenes de transferencia origen→destino, flujo de estados, preparación, despacho, recepción con diferencias, stock automático en ambos lados",
+  "dependencies": [1, 2, 3],
+  "estimated_time_minutes": 120,
+  "manifest": {
+    "tables_new": [
+      {
+        "source_file": "Fase4_Transferencias/01_Tablas_Nuevas/Ordenes_Transferencia.csv",
+        "table_name": "Ordenes_Transferencia",
+        "key_column": "Orden_ID",
+        "is_part_of": false,
+        "security_filter": "OR(USERROLE(\"Administrador\"), IN([Sucursal_Origen_ID], SELECT(Usuarios_Sucursales[Sucursal_ID], [Email] = USEREMAIL())), IN([Sucursal_Destino_ID], SELECT(Usuarios_Sucursales[Sucursal_ID], [Email] = USEREMAIL())))"
+      },
+      {
+        "source_file": "Fase4_Transferencias/01_Tablas_Nuevas/Items_Transferencia.csv",
+        "table_name": "Items_Transferencia",
+        "key_column": "Item_ID",
+        "is_part_of": true,
+        "parent_table": "Ordenes_Transferencia",
+        "parent_ref": "Orden_ID",
+        "security_filter": "OR(USERROLE(\"Administrador\"), IN([Orden_ID].[Sucursal_Origen_ID], SELECT(Usuarios_Sucursales[Sucursal_ID], [Email] = USEREMAIL())), IN([Orden_ID].[Sucursal_Destino_ID], SELECT(Usuarios_Sucursales[Sucursal_ID], [Email] = USEREMAIL())))"
+      },
+      {
+        "source_file": "Fase4_Transferencias/01_Tablas_Nuevas/Recepciones_Transferencia.csv",
+        "table_name": "Recepciones_Transferencia",
+        "key_column": "Recepcion_ID",
+        "is_part_of": false,
+        "security_filter": "OR(USERROLE(\"Administrador\"), IN([Orden_ID].[Sucursal_Destino_ID], SELECT(Usuarios_Sucursales[Sucursal_ID], [Email] = USEREMAIL())))"
+      }
+    ],
+    "tables_extend": [
+      {
+        "table_name": "Ingredientes_y_Stock",
+        "audit_columns_file": "Fase4_Transferencias/03_Columnas_Auditoria_Por_Tabla/Columnas_Transferencias.csv"
+      }
+    ],
+    "actions": [
+      {"file": "Fase4_Transferencias/04_Actions_Transferencias.json", "count": 14}
+    ],
+    "bots": [
+      {"file": "Fase4_Transferencias/05_Bots_Transferencias.json", "count": 4}
+    ],
+    "tasks": [
+      {"file": "Fase4_Transferencias/06_Tasks_Bots_Transferencias.json", "count": 8}
+    ],
+    "views": [
+      {"file": "Fase4_Transferencias/07_Views_Transferencias.json", "count": 9}
+    ],
+    "config_global_updates": [
+      {"Config_ID": "CFG_013", "Clave": "UMBRAL_DIFERENCIA_TRANSFERENCIA_CRITICA", "Valor": "5", "Tipo": "Number"},
+      {"Config_ID": "CFG_014", "Clave": "HORAS_ALERTA_TRANSFERENCIA_ESTANCADA", "Valor": "24", "Tipo": "Number"}
+    ],
+    "deployment_steps": [
+      "create_3_new_tables_in_sheets",
+      "link_tables_in_appsheet_with_is_part_of",
+      "apply_audit_columns_to_all",
+      "apply_security_filters",
+      "create_actions",
+      "import_bots",
+      "import_tasks",
+      "import_views",
+      "update_config_global",
+      "regenerate_structure",
+      "deploy_staging",
+      "run_validation_tests"
+    ],
+    "validation_tests": 22
+  }
+}

@@ -1,0 +1,87 @@
+[
+  {
+    "TaskName": "Task_Notificar_Encargado_Merma_Pendiente",
+    "Type": "Push Notification",
+    "Description": "Envía push al Encargado de la sucursal de la merma",
+    "TableName": "Registro_de_Mermas_y_Vencimientos",
+    "Recipients": {
+      "Type": "Expression",
+      "Expression": "SELECT(Usuarios_Sucursales[Email], AND([Sucursal_ID] = [_THISROW].[Sucursal_ID], [Rol_Sucursal] = \"Encargado\", [Activo?] = TRUE))"
+    },
+    "Subject": "🔔 Nueva merma pendiente de revisión - {{[_THISROW].[Ingrediente_ID]}}",
+    "Body": "Se ha reportado una merma en **{{[_THISROW].[Sucursal_ID]}}** que requiere tu revisión:\n\n• **Ingrediente:** {{[_THISROW].[Ingrediente_ID]}}\n• **Tipo:** {{[_THISROW].[Tipo_Merma]}}\n• **Cantidad:** {{[_THISROW].[Cantidad]}} {{[_THISROW].[Unidad_Medida]}}\n• **Costo estimado:** ${{[_THISROW].[Costo_Total_Estimado]}}\n• **Reportado por:** {{[_THISROW].[Reportado_Por]}}\n• **Turno:** {{[_THISROW].[Turno]}}\n• **Motivo:** {{[_THISROW].[Motivo]}}\n\n👉 Abre la app para **Aprobar**, **Rechazar** o **Solicitar corrección**.",
+    "DeepLink": "appsheet://erp_gastronomico_pruebas/Registro_de_Mermas_y_Vencimientos/{{[_THISROW].[ID]}}",
+    "Attachment": {
+      "IncludeImage": true,
+      "ImageColumn": "Evidencia_Foto"
+    }
+  },
+  {
+    "TaskName": "Task_Descontar_Stock_Merma_Aprobada",
+    "Type": "Data: execute an action on a set of rows",
+    "Description": "Descuenta la cantidad de la merma del stock del ingrediente en la sucursal",
+    "TableName": "Ingredientes_y_Stock",
+    "RowSelection": {
+      "Type": "Expression",
+      "Expression": "FILTER(\"Ingredientes_y_Stock\", AND([Ingrediente_ID] = [_THISROW].[Ingrediente_ID], [Sucursal_ID] = [_THISROW].[Sucursal_ID]))"
+    },
+    "ReferencedAction": "Action_Descontar_Stock_Ingrediente",
+    "RunAsJob": true
+  },
+  {
+    "TaskName": "Task_Notificar_Operador_Merma_Rechazada",
+    "Type": "Push Notification",
+    "Description": "Notifica al operador que su merma fue rechazada o necesita corrección",
+    "TableName": "Registro_de_Mermas_y_Vencimientos",
+    "Recipients": {
+      "Type": "Expression",
+      "Expression": "[_THISROW].[Reportado_Por]"
+    },
+    "Subject": "⚠️ Tu merma fue {{IF([_THISROW].[Estado_Merma] = \"Rechazada\", \"RECHAZADA\", \"DEVUELTA PARA CORRECCIÓN\")}} - {{[_THISROW].[Ingrediente_ID]}}",
+    "Body": "Tu reporte de merma en **{{[_THISROW].[Sucursal_ID]}}** ha sido {{IF([_THISROW].[Estado_Merma] = \"Rechazada\", \"rechazada\", \"devuelta para corrección\")}}:\n\n• **Ingrediente:** {{[_THISROW].[Ingrediente_ID]}}\n• **Cantidad:** {{[_THISROW].[Cantidad]}} {{[_THISROW].[Unidad_Medida]}}\n• **Motivo:** {{[_THISROW].[Motivo_Rechazo]}}\n\n{{IF([_THISROW].[Estado_Merma] = \"Correccion_Solicitada\", \"Corrige los datos y reenvía a revisión desde la app.\", \"Si consideras que es un error, contacta a tu Encargado.\")}}",
+    "DeepLink": "appsheet://erp_gastronomico_pruebas/Registro_de_Mermas_y_Vencimientos/{{[_THISROW].[ID]}}"
+  },
+  {
+    "TaskName": "Task_Alerta_Stock_Critico_Admin",
+    "Type": "Push Notification",
+    "Description": "Alerta a Admins cuando stock queda bajo punto de reorden tras merma",
+    "TableName": "Registro_de_Mermas_y_Vencimientos",
+    "Recipients": {
+      "Type": "Expression",
+      "Expression": "SELECT(Usuarios[Email], AND([Rol_Principal] = \"Administrador\", [Activo?] = TRUE))"
+    },
+    "Subject": "🚨 STOCK CRÍTICO tras merma - {{[_THISROW].[Ingrediente_ID]}} en {{[_THISROW].[Sucursal_ID]}}",
+    "Body": "¡ATENCIÓN! La merma aprobada ha dejado el stock **BAJO EL PUNTO DE REORDEN**:\n\n• **Ingrediente:** {{[_THISROW].[Ingrediente_ID]}}\n• **Sucursal:** {{[_THISROW].[Sucursal_ID]}}\n• **Stock actual:** {{LOOKUP([_THISROW].[Ingrediente_ID], \"Ingredientes_y_Stock\", \"Ingrediente_ID\", \"Stock_Actual\")}} {{LOOKUP([_THISROW].[Ingrediente_ID], \"Ingredientes_y_Stock\", \"Ingrediente_ID\", \"Unidad_Base\")}}\n• **Punto reorden:** {{LOOKUP([_THISROW].[Ingrediente_ID], \"Ingredientes_y_Stock\", \"Ingrediente_ID\", \"Punto_Reorden\")}}\n• **Merma aplicada:** {{[_THISROW].[Cantidad]}} {{[_THISROW].[Unidad_Medida]}}\n• **Costo merma:** ${{[_THISROW].[Costo_Total_Estimado]}}\n\n⚡ **Acción requerida:** Generar orden de compra urgente o transferencia entre sucursales.",
+    "DeepLink": "appsheet://erp_gastronomico_pruebas/Ingredientes_y_Stock/{{[_THISROW].[Ingrediente_ID]}}"
+  },
+  {
+    "TaskName": "Task_Alerta_Merma_Monto_Alto_Admin",
+    "Type": "Push Notification",
+    "Description": "Alerta a Admins cuando merma aprobada supera umbral de costo",
+    "TableName": "Registro_de_Mermas_y_Vencimientos",
+    "Recipients": {
+      "Type": "Expression",
+      "Expression": "SELECT(Usuarios[Email], AND([Rol_Principal] = \"Administrador\", [Activo?] = TRUE))"
+    },
+    "Subject": "💰 MERMA DE ALTO IMPACTO - ${{[_THISROW].[Costo_Total_Estimado]}} - {{[_THISROW].[Sucursal_ID]}}",
+    "Body": "Se aprobó una merma que supera el umbral de alerta configurado:\n\n• **Ingrediente:** {{[_THISROW].[Ingrediente_ID]}}\n• **Sucursal:** {{[_THISROW].[Sucursal_ID]}}\n• **Tipo:** {{[_THISROW].[Tipo_Merma]}}\n• **Cantidad:** {{[_THISROW].[Cantidad]}} {{[_THISROW].[Unidad_Medida]}}\n• **Costo total:** ${{[_THISROW].[Costo_Total_Estimado]}}\n• **Umbral:** ${{LOOKUP(\"UMBRAL_ALERTA_MERMA_COSTO\", \"Config_Global\", \"Clave\", \"Valor\")}}\n• **Aprobado por:** {{[_THISROW].[Aprobado_Por]}}\n\nRevisa si requiere investigación o ajuste de procesos.",
+    "DeepLink": "appsheet://erp_gastronomico_pruebas/Registro_de_Mermas_y_Vencimientos/{{[_THISROW].[ID]}}"
+  },
+  {
+    "TaskName": "Task_Recordatorio_Merma_Pendiente_Vencida",
+    "Type": "Push Notification",
+    "Description": "Recordatorio cada 4h a Encargados de mermas pendientes > 4h",
+    "TableName": "Registro_de_Mermas_y_Vencimientos",
+    "RowSelection": {
+      "Type": "Expression",
+      "Expression": "FILTER(\"Registro_de_Mermas_y_Vencimientos\", AND([Estado_Merma] = \"Pendiente\", HOUR(NOW() - [Enviado_A_Revision_En]) >= 4))"
+    },
+    "Recipients": {
+      "Type": "Expression",
+      "Expression": "SELECT(Usuarios_Sucursales[Email], AND([Sucursal_ID] = [_THISROW].[Sucursal_ID], [Rol_Sucursal] = \"Encargado\", [Activo?] = TRUE))"
+    },
+    "Subject": "⏰ Recordatorio: Merma pendiente hace +4h - {{[_THISROW].[Ingrediente_ID]}}",
+    "Body": "Esta merma lleva **más de 4 horas** pendiente de tu revisión:\n\n• **Ingrediente:** {{[_THISROW].[Ingrediente_ID]}}\n• **Sucursal:** {{[_THISROW].[Sucursal_ID]}}\n• **Reportado:** {{[_THISROW].[Enviado_A_Revision_En]}} (hace {{HOUR(NOW() - [_THISROW].[Enviado_A_Revision_En])}}h)\n• **Costo estimado:** ${{[_THISROW].[Costo_Total_Estimado]}}\n\nPor favor revisa y **Aprueba**, **Rechaza** o **Solicita corrección** cuanto antes.",
+    "DeepLink": "appsheet://erp_gastronomico_pruebas/Registro_de_Mermas_y_Vencimientos/{{[_THISROW].[ID]}}"
+  }
+]

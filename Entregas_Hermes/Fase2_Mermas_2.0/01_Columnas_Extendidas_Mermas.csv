@@ -1,0 +1,34 @@
+Tabla_Objetivo,Nombre_Columna,Tipo_Dato,Es_Key?,Es_Ref?,Ref_Table,Initial_Value,App_Formula,Show_If,Valid_If,Descripcion,Editable_En_Formulario?,Orden,Fase
+Registro_de_Mermas_y_Vencimientos,Estado_Merma,Enum,FALSE,FALSE,,Borrador,,,"IN([_THIS], LIST("Borrador", "Pendiente", "En_Revision", "Aprobada", "Rechazada", "Correccion_Solicitada", "Anulada"))","Estado del flujo de aprobación de la merma",TRUE,10,2
+Registro_de_Mermas_y_Vencimientos,Tipo_Merma,Enum,FALSE,FALSE,,Merma,,,"IN([_THIS], LIST("Merma", "Vencimiento", "Rotura", "Devolucion", "Ajuste_Inventario", "Donacion", "Otro"))","Clasificación del tipo de salida",TRUE,11,2
+Registro_de_Mermas_y_Vencimientos,Cantidad,Decimal,FALSE,FALSE,,,,,">0","Cantidad en unidad base del ingrediente",TRUE,12,2
+Registro_de_Mermas_y_Vencimientos,Unidad_Medida,Text,FALSE,FALSE,,LOOKUP([Ingrediente_ID], "Ingredientes_y_Stock", "Ingrediente_ID", "Unidad_Base"),FALSE,,"Unidad de medida (autocompletada desde ingrediente)",FALSE,13,2
+Registro_de_Mermas_y_Vencimientos,Costo_Unitario_Estimado,Price,FALSE,FALSE,,LOOKUP([Ingrediente_ID], "Ingredientes_y_Stock", "Ingrediente_ID", "Costo_Actual"),FALSE,,">=0","Costo unitario al momento de la merma (snapshot)",FALSE,14,2
+Registro_de_Mermas_y_Vencimientos,Costo_Total_Estimado,Price,FALSE,FALSE,,[Cantidad] * [Costo_Unitario_Estimado],FALSE,,">=0","Costo total estimado de la merma",FALSE,15,2
+Registro_de_Mermas_y_Vencimientos,Motivo,LongText,FALSE,FALSE,,,,,"LEN([_THIS]) >= 10","Motivo detallado (mín 10 caracteres)",TRUE,16,2
+Registro_de_Mermas_y_Vencimientos,Evidencia_Foto,Image,FALSE,FALSE,,,,,"ISNOTBLANK([_THIS]) OR [Estado_Merma] = \"Borrador\"","Foto obligatoria salvo en Borrador",TRUE,17,2
+Registro_de_Mermas_y_Vencimientos,Ubicacion_Especifica,Text,FALSE,FALSE,,,,,"Almacén / Nevera / Estación / Área específica",TRUE,18,2
+Registro_de_Mermas_y_Vencimientos,Turno,Enum,FALSE,FALSE,,Apertura,,,"IN([_THIS], LIST("Apertura", "Medio_Dia", "Cierre", "Noche", "No_Aplica"))","Turno en que ocurrió",TRUE,19,2
+Registro_de_Mermas_y_Vencimientos,Reportado_Por,Text,FALSE,FALSE,,USEREMAIL(),FALSE,,"Email de quien reporta (auto)",FALSE,20,2
+Registro_de_Mermas_y_Vencimientos,Fecha_Hora_Evento,DateTime,FALSE,FALSE,,NOW(),FALSE,,"Cuándo ocurrió realmente (puede ser retroactivo)",TRUE,21,2
+Registro_de_Mermas_y_Vencimientos,Enviado_A_Revision_En,DateTime,FALSE,FALSE,,,FALSE,,"Timestamp cuando pasó a Pendiente/En_Revision",FALSE,22,2
+Registro_de_Mermas_y_Vencimientos,Enviado_A_Revision_Por,Text,FALSE,FALSE,,,FALSE,,"Usuario que envió a revisión",FALSE,23,2
+Registro_de_Mermas_y_Vencimientos,Aprobado_Por,Text,FALSE,FALSE,,,FALSE,,"Email del Encargado/Admin que aprobó",FALSE,24,2
+Registro_de_Mermas_y_Vencimientos,Fecha_Aprobacion,DateTime,FALSE,FALSE,,,FALSE,,"Cuándo se aprobó",FALSE,25,2
+Registro_de_Mermas_y_Vencimientos,Rechazado_Por,Text,FALSE,FALSE,,,FALSE,,"Email de quien rechazó",FALSE,26,2
+Registro_de_Mermas_y_Vencimientos,Fecha_Rechazo,DateTime,FALSE,FALSE,,,FALSE,,"Cuándo se rechazó",FALSE,27,2
+Registro_de_Mermas_y_Vencimientos,Motivo_Rechazo,LongText,FALSE,FALSE,,,FALSE,,"Por qué se rechazó / qué corregir",FALSE,28,2
+Registro_de_Mermas_y_Vencimientos,Correccion_Solicitada_En,DateTime,FALSE,FALSE,,,FALSE,,"Timestamp de solicitud de corrección",FALSE,29,2
+Registro_de_Mermas_y_Vencimientos,Correccion_Realizada_En,DateTime,FALSE,FALSE,,,FALSE,,"Timestamp cuando operador corrigió",FALSE,30,2
+Registro_de_Mermas_y_Vencimientos,Veces_Reenviada,Number,FALSE,FALSE,,0,FALSE,,">=0","Contador de reenvíos a revisión",FALSE,31,2
+Registro_de_Mermas_y_Vencimientos,Anulada_Por,Text,FALSE,FALSE,,,FALSE,,"Email de Admin que anuló",FALSE,32,2
+Registro_de_Mermas_y_Vencimientos,Fecha_Anulacion,DateTime,FALSE,FALSE,,,FALSE,,"Cuándo se anuló",FALSE,33,2
+Registro_de_Mermas_y_Vencimientos,Motivo_Anulacion,LongText,FALSE,FALSE,,,FALSE,,"Por qué se anuló",FALSE,34,2
+Registro_de_Mermas_y_Vencimientos,Descuento_Stock_Aplicado?,Yes/No,FALSE,FALSE,,FALSE,FALSE,,,"TRUE = ya se descontó del stock (Bot post-aprobación)",FALSE,35,2
+Registro_de_Mermas_y_Vencimientos,Fecha_Descuento_Stock,DateTime,FALSE,FALSE,,,FALSE,,"Cuándo se aplicó el descuento",FALSE,36,2
+Registro_de_Mermas_y_Vencimientos,Ingrediente_Afectado_Stock_ID,Ref,FALSE,TRUE,Ingredientes_y_Stock,,FALSE,,,"Ref al ingrediente cuyo stock se movió (para auditoría)",FALSE,37,2
+Registro_de_Mermas_y_Vencimientos,Stock_Anterior,Decimal,FALSE,FALSE,,,FALSE,,,">=0","Stock antes del descuento",FALSE,38,2
+Registro_de_Mermas_y_Vencimientos,Stock_Posterior,Decimal,FALSE,FALSE,,,FALSE,,,">=0","Stock después del descuento",FALSE,39,2
+Registro_de_Mermas_y_Vencimientos,Requiere_Compra_Urgente?,Yes/No,FALSE,FALSE,,FALSE,FALSE,,,"Auto-calculado: TRUE si stock < punto_reorden tras merma",FALSE,40,2
+Registro_de_Mermas_y_Vencimientos,Notificacion_Encargado_Enviada?,Yes/No,FALSE,FALSE,,FALSE,FALSE,,,"Bot ya notificó al encargado",FALSE,41,2
+Registro_de_Mermas_y_Vencimientos,Notificacion_Admin_Enviada?,Yes/No,FALSE,FALSE,,FALSE,FALSE,,,"Bot ya notificó a admin (si monto > umbral)",FALSE,42,2

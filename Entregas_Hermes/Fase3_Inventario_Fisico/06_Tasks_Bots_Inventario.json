@@ -1,0 +1,88 @@
+[
+  {
+    "TaskName": "Task_Notificar_Operadores_Conteo_Iniciado",
+    "Type": "Push Notification",
+    "Description": "Push a operadores de la sucursal cuando empieza un conteo",
+    "TableName": "Conteos_Inventario",
+    "Recipients": {
+      "Type": "Expression",
+      "Expression": "SELECT(Usuarios_Sucursales[Email], AND([Sucursal_ID] = [_THISROW].[Sucursal_ID], [Rol_Sucursal] = \"Operador\", [Activo?] = TRUE))"
+    },
+    "Subject": "📋 Inventario iniciado - {{[_THISROW].[Plantilla_ID].[Nombre]}} en {{[_THISROW].[Sucursal_ID].[Nombre]}}",
+    "Body": "El Encargado ha iniciado el conteo programado:\n\n• **Plantilla:** {{[_THISROW].[Plantilla_ID].[Nombre]}}\n• **Sucursal:** {{[_THISROW].[Sucursal_ID].[Nombre]}}\n• **Iniciado por:** {{[_THISROW].[Iniciado_Por]}}\n• **Fecha inicio:** {{[_THISROW].[Fecha_Inicio]}}\n\n👉 Abre la app y ve a **\"Mis Conteos Asignados\"** para empezar a contar.",
+    "DeepLink": "appsheet://erp_gastronomico_pruebas/Conteos_Inventario/{{[_THISROW].[Conteo_ID]}}"
+  },
+  {
+    "TaskName": "Task_Generar_Ajustes_Desde_Conteo",
+    "Type": "Data: execute an action on a set of rows",
+    "Description": "Ejecuta Action_Generar_Ajustes_Aprobados en el conteo aprobado",
+    "TableName": "Conteos_Inventario",
+    "RowSelection": {
+      "Type": "Expression",
+      "Expression": "[_THISROW]"
+    },
+    "ReferencedAction": "Action_Generar_Ajustes_Aprobados"
+  },
+  {
+    "TaskName": "Task_Alerta_Diferencias_Criticas_Admin",
+    "Type": "Push Notification",
+    "Description": "Alerta a Admins si conteo aprobado tiene diferencias > umbral crítico",
+    "TableName": "Conteos_Inventario",
+    "Recipients": {
+      "Type": "Expression",
+      "Expression": "SELECT(Usuarios[Email], AND([Rol_Principal] = \"Administrador\", [Activo?] = TRUE))"
+    },
+    "Subject": "🚨 INVENTARIO: Diferencias críticas en {{[_THISROW].[Sucursal_ID].[Nombre]}} - {{[_THISROW].[Plantilla_ID].[Nombre]}}",
+    "Body": "El conteo **{{[_THISROW].[Conteo_ID]}}** ha sido aprobado con **diferencias fuera de tolerancia**:\n\n• **Sucursal:** {{[_THISROW].[Sucursal_ID].[Nombre]}}\n• **Plantilla:** {{[_THISROW].[Plantilla_ID].[Nombre]}}\n• **Items con diferencia:** {{COUNT(FILTER(\"Items_Conteo\", AND([Conteo_ID] = [_THISROW].[Conteo_ID], [Esta_Fuera_Tolerancia?] = TRUE)))}}\n• **Total items contados:** {{COUNT(FILTER(\"Items_Conteo\", [Conteo_ID] = [_THISROW].[Conteo_ID]))}}\n• **Aprobado por:** {{[_THISROW].[Aprobado_Por]}}\n\n⚡ Revisar ajustes generados y validar mermas automáticas.",
+    "DeepLink": "appsheet://erp_gastronomico_pruebas/Conteos_Inventario/{{[_THISROW].[Conteo_ID]}}"
+  },
+  {
+    "TaskName": "Task_Aplicar_Ajuste_Stock_Ingrediente",
+    "Type": "Data: execute an action on a set of rows",
+    "Description": "Ejecuta Action_Aplicar_Ajuste_Stock en el ingrediente afectado",
+    "TableName": "Ajustes_Inventario",
+    "RowSelection": {
+      "Type": "Expression",
+      "Expression": "FILTER(\"Ingredientes_y_Stock\", AND([Ingrediente_ID] = [_THISROW].[Ingrediente_ID], [Sucursal_ID] = [_THISROW].[Sucursal_ID]))"
+    },
+    "ReferencedAction": "Action_Actualizar_Stock_Ingrediente"
+  },
+  {
+    "TaskName": "Task_Crear_Merma_Automatica_Si_Negativo",
+    "Type": "Data: execute an action on a set of rows",
+    "Description": "Si ajuste generó merma automática, ejecuta Merma_Auto_Desde_Ajuste",
+    "TableName": "Ajustes_Inventario",
+    "RowSelection": {
+      "Type": "Expression",
+      "Expression": "[_THISROW]"
+    },
+    "ReferencedAction": "Merma_Auto_Desde_Ajuste",
+    "Condition": "[_THISROW].[Genero_Merma_Auto?] = TRUE"
+  },
+  {
+    "TaskName": "Task_Alerta_Conteo_Vencido_Encargado",
+    "Type": "Push Notification",
+    "Description": "Recordatorio diario a Encargado de conteos vencidos sin iniciar",
+    "TableName": "Conteos_Inventario",
+    "Recipients": {
+      "Type": "Expression",
+      "Expression": "SELECT(Usuarios_Sucursales[Email], AND([Sucursal_ID] = [_THISROW].[Sucursal_ID], [Rol_Sucursal] = \"Encargado\", [Activo?] = TRUE))"
+    },
+    "Subject": "⏰ CONTEO VENCIDO - {{[_THISROW].[Plantilla_ID].[Nombre]}} en {{[_THISROW].[Sucursal_ID].[Nombre]}}",
+    "Body": "Este conteo programado **no se ha iniciado** y ya pasó su fecha:\n\n• **Plantilla:** {{[_THISROW].[Plantilla_ID].[Nombre]}}\n• **Sucursal:** {{[_THISROW].[Sucursal_ID].[Nombre]}}\n• **Fecha programada:** {{[_THISROW].[Fecha_Programada]}} (hace {{DAY(TODAY() - [_THISROW].[Fecha_Programada])}} días)\n• **Estado actual:** {{[_THISROW].[Estado]}}\n\n⚡ Inicia el conteo cuanto antes para evitar desviaciones de stock no detectadas.",
+    "DeepLink": "appsheet://erp_gastronomico_pruebas/Conteos_Inventario/{{[_THISROW].[Conteo_ID]}}"
+  },
+  {
+    "TaskName": "Task_Alerta_Item_Fuera_Tolerancia_Encargado",
+    "Type": "Push Notification",
+    "Description": "Alerta inmediata cuando operador registra item fuera de tolerancia",
+    "TableName": "Items_Conteo",
+    "Recipients": {
+      "Type": "Expression",
+      "Expression": "SELECT(Usuarios_Sucursales[Email], AND([Sucursal_ID] = [_THISROW].[Conteo_ID].[Sucursal_ID], [Rol_Sucursal] = \"Encargado\", [Activo?] = TRUE))"
+    },
+    "Subject": "⚠️ FUERA DE TOLERANCIA - {{[_THISROW].[Ingrediente_ID].[Nombre]}} ({{[_THISROW].[Porcentaje_Diferencia]}}%)",
+    "Body": "El operador **{{[_THISROW].[Contado_Por]}}** ha registrado un conteo **FUERA DE TOLERANCIA**:\n\n• **Ingrediente:** {{[_THISROW].[Ingrediente_ID].[Nombre]}}\n• **Stock teórico:** {{[_THISROW].[Stock_Teorico]}} {{[_THISROW].[Unidad_Medida]}}\n• **Stock contado:** {{[_THISROW].[Stock_Contado]}} {{[_THISROW].[Unidad_Medida]}}\n• **Diferencia:** {{[_THISROW].[Diferencia]}} {{[_THISROW].[Unidad_Medida]}} (**{{[_THISROW].[Porcentaje_Diferencia]}}%**)\n• **Tolerancia permitida:** ±{{[_THISROW].[Tolerancia_Aplicada]}}%\n• **Conteo:** {{[_THISROW].[Conteo_ID]}}\n• **Observación operador:** {{[_THISROW].[Observacion_Contador]}}\n\n👉 Revisa y decide si **aprobar el ajuste** o **solicitar reconteo**.",
+    "DeepLink": "appsheet://erp_gastronomico_pruebas/Items_Conteo/{{[_THISROW].[Item_ID]}}"
+  }
+]

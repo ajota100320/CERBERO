@@ -1,0 +1,73 @@
+Tabla_Objetivo,Nombre_Columna,Tipo_Dato,Es_Key?,Es_Ref?,Ref_Table,Initial_Value,App_Formula,Show_If,Valid_If,Descripcion,Editable_En_Formulario?,Orden
+Ingredientes_y_Stock,ID,Text,TRUE,FALSE,,UNIQUEID(),,,FALSE,"Clave única estable generada en dispositivo (offline-first)",FALSE,1
+Ingredientes_y_Stock,Created_At,DateTime,FALSE,FALSE,,NOW(),,,FALSE,"Timestamp de creación del registro",FALSE,2
+Ingredientes_y_Stock,Created_By,Text,FALSE,FALSE,,USEREMAIL(),,,FALSE,"Email del usuario que creó el registro",FALSE,3
+Ingredientes_y_Stock,Updated_At,DateTime,FALSE,FALSE,,,NOW(),,FALSE,"Timestamp de última modificación (se actualiza en cada sync)",FALSE,4
+Ingredientes_y_Stock,Updated_By,Text,FALSE,FALSE,,,USEREMAIL(),,FALSE,"Email del usuario que modificó por última vez",FALSE,5
+Ingredientes_y_Stock,Deleted?,Yes/No,FALSE,FALSE,,FALSE,,,FALSE,"Soft delete: TRUE = oculto, no borrado físico",FALSE,6
+Ingredientes_y_Stock,Sucursal_ID,Ref,FALSE,TRUE,Sucursales,,LOOKUP(USEREMAIL(), ""Usuarios_Sucursales"", ""Email"", ""Sucursal_ID""),FALSE,"Sucursal propietaria del registro (aislamiento multisucursal)",FALSE,7
+Ingredientes_y_Stock,Sync_Pending?,Yes/No,FALSE,FALSE,,TRUE,,,FALSE,"Bandera: TRUE = pendiente de sincronizar, FALSE = sincronizado",FALSE,8
+Registro_de_Compras,ID,Text,TRUE,FALSE,,UNIQUEID(),,,FALSE,"Clave única estable generada en dispositivo (offline-first)",FALSE,1
+Registro_de_Compras,Created_At,DateTime,FALSE,FALSE,,NOW(),,,FALSE,"Timestamp de creación del registro",FALSE,2
+Registro_de_Compras,Created_By,Text,FALSE,FALSE,,USEREMAIL(),,,FALSE,"Email del usuario que creó el registro",FALSE,3
+Registro_de_Compras,Updated_At,DateTime,FALSE,FALSE,,,NOW(),,FALSE,"Timestamp de última modificación (se actualiza en cada sync)",FALSE,4
+Registro_de_Compras,Updated_By,Text,FALSE,FALSE,,,USEREMAIL(),,FALSE,"Email del usuario que modificó por última vez",FALSE,5
+Registro_de_Compras,Deleted?,Yes/No,FALSE,FALSE,,FALSE,,,FALSE,"Soft delete: TRUE = oculto, no borrado físico",FALSE,6
+Registro_de_Compras,Sucursal_ID,Ref,FALSE,TRUE,Sucursales,,LOOKUP(USEREMAIL(), ""Usuarios_Sucursales"", ""Email"", ""Sucursal_ID""),FALSE,"Sucursal propietaria del registro (aislamiento multisucursal)",FALSE,7
+Registro_de_Compras,Sync_Pending?,Yes/No,FALSE,FALSE,,TRUE,,,FALSE,"Bandera: TRUE = pendiente de sincronizar, FALSE = sincronizado",FALSE,8
+Detalle_de_Compras,ID,Text,TRUE,FALSE,,UNIQUEID(),,,FALSE,"Clave única estable generada en dispositivo (offline-first)",FALSE,1
+Detalle_de_Compras,Created_At,DateTime,FALSE,FALSE,,NOW(),,,FALSE,"Timestamp de creación del registro",FALSE,2
+Detalle_de_Compras,Created_By,Text,FALSE,FALSE,,USEREMAIL(),,,FALSE,"Email del usuario que creó el registro",FALSE,3
+Detalle_de_Compras,Updated_At,DateTime,FALSE,FALSE,,,NOW(),,FALSE,"Timestamp de última modificación (se actualiza en cada sync)",FALSE,4
+Detalle_de_Compras,Updated_By,Text,FALSE,FALSE,,,USEREMAIL(),,FALSE,"Email del usuario que modificó por última vez",FALSE,5
+Detalle_de_Compras,Deleted?,Yes/No,FALSE,FALSE,,FALSE,,,FALSE,"Soft delete: TRUE = oculto, no borrado físico",FALSE,6
+Detalle_de_Compras,Sucursal_ID,Ref,FALSE,TRUE,Sucursales,,LOOKUP(USEREMAIL(), ""Usuarios_Sucursales"", ""Email"", ""Sucursal_ID""),FALSE,"Sucursal propietaria del registro (aislamiento multisucursal)",FALSE,7
+Detalle_de_Compras,Sync_Pending?,Yes/No,FALSE,FALSE,,TRUE,,,FALSE,"Bandera: TRUE = pendiente de sincronizar, FALSE = sincronizado",FALSE,8
+Registro_de_Mermas_y_Vencimientos,ID,Text,TRUE,FALSE,,UNIQUEID(),,,FALSE,"Clave única estable generada en dispositivo (offline-first)",FALSE,1
+Registro_de_Mermas_y_Vencimientos,Created_At,DateTime,FALSE,FALSE,,NOW(),,,FALSE,"Timestamp de creación del registro",FALSE,2
+Registro_de_Mermas_y_Vencimientos,Created_By,Text,FALSE,FALSE,,USEREMAIL(),,,FALSE,"Email del usuario que creó el registro",FALSE,3
+Registro_de_Mermas_y_Vencimientos,Updated_At,DateTime,FALSE,FALSE,,,NOW(),,FALSE,"Timestamp de última modificación (se actualiza en cada sync)",FALSE,4
+Registro_de_Mermas_y_Vencimientos,Updated_By,Text,FALSE,FALSE,,,USEREMAIL(),,FALSE,"Email del usuario que modificó por última vez",FALSE,5
+Registro_de_Mermas_y_Vencimientos,Deleted?,Yes/No,FALSE,FALSE,,FALSE,,,FALSE,"Soft delete: TRUE = oculto, no borrado físico",FALSE,6
+Registro_de_Mermas_y_Vencimientos,Sucursal_ID,Ref,FALSE,TRUE,Sucursales,,LOOKUP(USEREMAIL(), ""Usuarios_Sucursales"", ""Email"", ""Sucursal_ID""),FALSE,"Sucursal propietaria del registro (aislamiento multisucursal)",FALSE,7
+Registro_de_Mermas_y_Vencimientos,Sync_Pending?,Yes/No,FALSE,FALSE,,TRUE,,,FALSE,"Bandera: TRUE = pendiente de sincronizar, FALSE = sincronizado",FALSE,8
+Control_de_Gastos,ID,Text,TRUE,FALSE,,UNIQUEID(),,,FALSE,"Clave única estable generada en dispositivo (offline-first)",FALSE,1
+Control_de_Gastos,Created_At,DateTime,FALSE,FALSE,,NOW(),,,FALSE,"Timestamp de creación del registro",FALSE,2
+Control_de_Gastos,Created_By,Text,FALSE,FALSE,,USEREMAIL(),,,FALSE,"Email del usuario que creó el registro",FALSE,3
+Control_de_Gastos,Updated_At,DateTime,FALSE,FALSE,,,NOW(),,FALSE,"Timestamp de última modificación (se actualiza en cada sync)",FALSE,4
+Control_de_Gastos,Updated_By,Text,FALSE,FALSE,,,USEREMAIL(),,FALSE,"Email del usuario que modificó por última vez",FALSE,5
+Control_de_Gastos,Deleted?,Yes/No,FALSE,FALSE,,FALSE,,,FALSE,"Soft delete: TRUE = oculto, no borrado físico",FALSE,6
+Control_de_Gastos,Sucursal_ID,Ref,FALSE,TRUE,Sucursales,,LOOKUP(USEREMAIL(), ""Usuarios_Sucursales"", ""Email"", ""Sucursal_ID""),FALSE,"Sucursal propietaria del registro (aislamiento multisucursal)",FALSE,7
+Control_de_Gastos,Sync_Pending?,Yes/No,FALSE,FALSE,,TRUE,,,FALSE,"Bandera: TRUE = pendiente de sincronizar, FALSE = sincronizado",FALSE,8
+Lista_de_Verificacion_Diario,ID,Text,TRUE,FALSE,,UNIQUEID(),,,FALSE,"Clave única estable generada en dispositivo (offline-first)",FALSE,1
+Lista_de_Verificacion_Diario,Created_At,DateTime,FALSE,FALSE,,NOW(),,,FALSE,"Timestamp de creación del registro",FALSE,2
+Lista_de_Verificacion_Diario,Created_By,Text,FALSE,FALSE,,USEREMAIL(),,,FALSE,"Email del usuario que creó el registro",FALSE,3
+Lista_de_Verificacion_Diario,Updated_At,DateTime,FALSE,FALSE,,,NOW(),,FALSE,"Timestamp de última modificación (se actualiza en cada sync)",FALSE,4
+Lista_de_Verificacion_Diario,Updated_By,Text,FALSE,FALSE,,,USEREMAIL(),,FALSE,"Email del usuario que modificó por última vez",FALSE,5
+Lista_de_Verificacion_Diario,Deleted?,Yes/No,FALSE,FALSE,,FALSE,,,FALSE,"Soft delete: TRUE = oculto, no borrado físico",FALSE,6
+Lista_de_Verificacion_Diario,Sucursal_ID,Ref,FALSE,TRUE,Sucursales,,LOOKUP(USEREMAIL(), ""Usuarios_Sucursales"", ""Email"", ""Sucursal_ID""),FALSE,"Sucursal propietaria del registro (aislamiento multisucursal)",FALSE,7
+Lista_de_Verificacion_Diario,Sync_Pending?,Yes/No,FALSE,FALSE,,TRUE,,,FALSE,"Bandera: TRUE = pendiente de sincronizar, FALSE = sincronizado",FALSE,8
+Higiene_del_Personal,ID,Text,TRUE,FALSE,,UNIQUEID(),,,FALSE,"Clave única estable generada en dispositivo (offline-first)",FALSE,1
+Higiene_del_Personal,Created_At,DateTime,FALSE,FALSE,,NOW(),,,FALSE,"Timestamp de creación del registro",FALSE,2
+Higiene_del_Personal,Created_By,Text,FALSE,FALSE,,USEREMAIL(),,,FALSE,"Email del usuario que creó el registro",FALSE,3
+Higiene_del_Personal,Updated_At,DateTime,FALSE,FALSE,,,NOW(),,FALSE,"Timestamp de última modificación (se actualiza en cada sync)",FALSE,4
+Higiene_del_Personal,Updated_By,Text,FALSE,FALSE,,,USEREMAIL(),,FALSE,"Email del usuario que modificó por última vez",FALSE,5
+Higiene_del_Personal,Deleted?,Yes/No,FALSE,FALSE,,FALSE,,,FALSE,"Soft delete: TRUE = oculto, no borrado físico",FALSE,6
+Higiene_del_Personal,Sucursal_ID,Ref,FALSE,TRUE,Sucursales,,LOOKUP(USEREMAIL(), ""Usuarios_Sucursales"", ""Email"", ""Sucursal_ID""),FALSE,"Sucursal propietaria del registro (aislamiento multisucursal)",FALSE,7
+Higiene_del_Personal,Sync_Pending?,Yes/No,FALSE,FALSE,,TRUE,,,FALSE,"Bandera: TRUE = pendiente de sincronizar, FALSE = sincronizado",FALSE,8
+Registro_Temperaturas,ID,Text,TRUE,FALSE,,UNIQUEID(),,,FALSE,"Clave única estable generada en dispositivo (offline-first)",FALSE,1
+Registro_Temperaturas,Created_At,DateTime,FALSE,FALSE,,NOW(),,,FALSE,"Timestamp de creación del registro",FALSE,2
+Registro_Temperaturas,Created_By,Text,FALSE,FALSE,,USEREMAIL(),,,FALSE,"Email del usuario que creó el registro",FALSE,3
+Registro_Temperaturas,Updated_At,DateTime,FALSE,FALSE,,,NOW(),,FALSE,"Timestamp de última modificación (se actualiza en cada sync)",FALSE,4
+Registro_Temperaturas,Updated_By,Text,FALSE,FALSE,,,USEREMAIL(),,FALSE,"Email del usuario que modificó por última vez",FALSE,5
+Registro_Temperaturas,Deleted?,Yes/No,FALSE,FALSE,,FALSE,,,FALSE,"Soft delete: TRUE = oculto, no borrado físico",FALSE,6
+Registro_Temperaturas,Sucursal_ID,Ref,FALSE,TRUE,Sucursales,,LOOKUP(USEREMAIL(), ""Usuarios_Sucursales"", ""Email"", ""Sucursal_ID""),FALSE,"Sucursal propietaria del registro (aislamiento multisucursal)",FALSE,7
+Registro_Temperaturas,Sync_Pending?,Yes/No,FALSE,FALSE,,TRUE,,,FALSE,"Bandera: TRUE = pendiente de sincronizar, FALSE = sincronizado",FALSE,8
+Proveedores,ID,Text,TRUE,FALSE,,UNIQUEID(),,,FALSE,"Clave única estable generada en dispositivo (offline-first)",FALSE,1
+Proveedores,Created_At,DateTime,FALSE,FALSE,,NOW(),,,FALSE,"Timestamp de creación del registro",FALSE,2
+Proveedores,Created_By,Text,FALSE,FALSE,,USEREMAIL(),,,FALSE,"Email del usuario que creó el registro",FALSE,3
+Proveedores,Updated_At,DateTime,FALSE,FALSE,,,NOW(),,FALSE,"Timestamp de última modificación (se actualiza en cada sync)",FALSE,4
+Proveedores,Updated_By,Text,FALSE,FALSE,,,USEREMAIL(),,FALSE,"Email del usuario que modificó por última vez",FALSE,5
+Proveedores,Deleted?,Yes/No,FALSE,FALSE,,FALSE,,,FALSE,"Soft delete: TRUE = oculto, no borrado físico",FALSE,6
+Proveedores,Sucursal_ID,Ref,FALSE,TRUE,Sucursales,,LOOKUP(USEREMAIL(), ""Usuarios_Sucursales"", ""Email"", ""Sucursal_ID""),FALSE,"Sucursal propietaria del registro (aislamiento multisucursal)",FALSE,7
+Proveedores,Sync_Pending?,Yes/No,FALSE,FALSE,,TRUE,,,FALSE,"Bandera: TRUE = pendiente de sincronizar, FALSE = sincronizado",FALSE,8

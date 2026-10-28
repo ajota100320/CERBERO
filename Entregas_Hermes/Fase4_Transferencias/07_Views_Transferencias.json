@@ -1,0 +1,255 @@
+[
+  {
+    "ViewName": "View_Transferencias_Encargado_Origen",
+    "TableName": "Ordenes_Transferencia",
+    "Type": "Deck",
+    "Position": 1,
+    "ShowIf": "OR(USERROLE(\"Administrador\"), USERROLE(\"Encargado\"))",
+    "Columns": [
+      "Estado",
+      "Sucursal_Destino_ID",
+      "Fecha_Solicitud",
+      "Aprobada_Destino_Por",
+      "Fecha_Aprobacion_Destino",
+      "Preparada_Por",
+      "Fecha_Preparacion",
+      "Despachada_Por",
+      "Fecha_Despacho"
+    ],
+    "RowFilter": "OR(USERROLE(\"Administrador\"), [Sucursal_Origen_ID] = LOOKUP(USEREMAIL(), \"Usuarios_Sucursales\", \"Email\", \"Sucursal_ID\"))",
+    "OrderBy": "Fecha_Solicitud DESC",
+    "GroupBy": "Estado",
+    "Options": {
+      "ShowSearch": true,
+      "ShowSelect": false,
+      "AllowInlineEdit": false
+    },
+    "Actions": [
+      "Transferencia_Solicitar",
+      "Transferencia_Aprobar_Origen",
+      "Transferencia_Iniciar_Preparacion",
+      "Transferencia_Despachar",
+      "Transferencia_Cancelar"
+    ]
+  },
+  {
+    "ViewName": "View_Transferencias_Encargado_Destino",
+    "TableName": "Ordenes_Transferencia",
+    "Type": "Deck",
+    "Position": 2,
+    "ShowIf": "OR(USERROLE(\"Administrador\"), USERROLE(\"Encargado\"))",
+    "Columns": [
+      "Estado",
+      "Sucursal_Origen_ID",
+      "Fecha_Solicitud",
+      "Aprobada_Origen_Por",
+      "Fecha_Aprobacion_Origen",
+      "Fecha_Recepcion",
+      "Recibida_Por"
+    ],
+    "RowFilter": "OR(USERROLE(\"Administrador\"), [Sucursal_Destino_ID] = LOOKUP(USEREMAIL(), \"Usuarios_Sucursales\", \"Email\", \"Sucursal_ID\"))",
+    "OrderBy": "Fecha_Solicitud DESC",
+    "GroupBy": "Estado",
+    "Options": {
+      "ShowSearch": true,
+      "ShowSelect": false,
+      "AllowInlineEdit": false
+    },
+    "Actions": [
+      "Transferencia_Aprobar_Destino",
+      "Transferencia_Recibir",
+      "Transferencia_Recepcion_Con_Diferencias"
+    ]
+  },
+  {
+    "ViewName": "View_Transferencia_Formulario_Nueva",
+    "TableName": "Ordenes_Transferencia",
+    "Type": "Form",
+    "Position": 3,
+    "ShowIf": "OR(USERROLE(\"Administrador\"), USERROLE(\"Encargado\"))",
+    "Columns": [
+      "Sucursal_Origen_ID",
+      "Sucursal_Destino_ID",
+      "Observaciones"
+    ],
+    "InitialValues": {
+      "Estado": "\"Borrador\"",
+      "Solicitada_Por": "USEREMAIL()",
+      "Fecha_Solicitud": "NOW()",
+      "Sucursal_Origen_ID": "LOOKUP(USEREMAIL(), \"Usuarios_Sucursales\", \"Email\", \"Sucursal_ID\")",
+      "Sync_Pending?": "TRUE"
+    },
+    "Options": {
+      "ShowCancelButton": true,
+      "ShowSaveButton": true
+    }
+  },
+  {
+    "ViewName": "View_Items_Transferencia_Preparar",
+    "TableName": "Items_Transferencia",
+    "Type": "Table",
+    "Position": 4,
+    "ShowIf": "OR(USERROLE(\"Administrador\"), USERROLE(\"Encargado\"), USERROLE(\"Operador\"))",
+    "Columns": [
+      "Ingrediente_ID",
+      "Cantidad_Solicitada",
+      "Unidad_Medida",
+      "Cantidad_Preparada",
+      "Estado_Item",
+      "Observacion_Preparador"
+    ],
+    "RowFilter": "AND([Orden_ID].[Estado] = \"En_Preparacion\", OR(USERROLE(\"Administrador\"), [Orden_ID].[Sucursal_Origen_ID] = LOOKUP(USEREMAIL(), \"Usuarios_Sucursales\", \"Email\", \"Sucursal_ID\")))",
+    "OrderBy": "Ingrediente_ID",
+    "Options": {
+      "ShowSearch": true,
+      "ShowSelect": false,
+      "AllowInlineEdit": true
+    },
+    "Actions": [
+      "Item_Preparar"
+    ]
+  },
+  {
+    "ViewName": "View_Items_Transferencia_Despachar",
+    "TableName": "Items_Transferencia",
+    "Type": "Table",
+    "Position": 5,
+    "ShowIf": "OR(USERROLE(\"Administrador\"), USERROLE(\"Encargado\"))",
+    "Columns": [
+      "Ingrediente_ID",
+      "Cantidad_Solicitada",
+      "Cantidad_Preparada",
+      "Cantidad_Despachada",
+      "Unidad_Medida",
+      "Estado_Item"
+    ],
+    "RowFilter": "AND([Orden_ID].[Estado] = \"Despachada\", [Orden_ID].[Sucursal_Origen_ID] = LOOKUP(USEREMAIL(), \"Usuarios_Sucursales\", \"Email\", \"Sucursal_ID\"))",
+    "OrderBy": "Ingrediente_ID",
+    "Options": {
+      "ShowSearch": true,
+      "ShowSelect": true,
+      "AllowInlineEdit": true
+    },
+    "Actions": [
+      "Item_Despachar"
+    ]
+  },
+  {
+    "ViewName": "View_Recepcion_Transferencia_Destino",
+    "TableName": "Recepciones_Transferencia",
+    "Type": "Form",
+    "Position": 6,
+    "ShowIf": "OR(USERROLE(\"Administrador\"), AND(USERROLE(\"Encargado\"), [Orden_ID].[Sucursal_Destino_ID] = LOOKUP(USEREMAIL(), \"Usuarios_Sucursales\", \"Email\", \"Sucursal_ID\")))",
+    "Columns": [
+      "Orden_ID",
+      "Item_ID",
+      "Ingrediente_ID",
+      "Cantidad_Esperada",
+      "Unidad_Medida",
+      "Cantidad_Recibida",
+      "Estado_Recepcion",
+      "Observaciones",
+      "Foto_Evidencia"
+    ],
+    "InitialValues": {
+      "Recibida_Por": "USEREMAIL()",
+      "Fecha_Recepcion": "NOW()",
+      "Estado_Recepcion": "\"Completa\"",
+      "Sync_Pending?": "TRUE"
+    },
+    "Options": {
+      "ShowCancelButton": true,
+      "ShowSaveButton": true
+    }
+  },
+  {
+    "ViewName": "View_Recepciones_Encargado_Revision",
+    "TableName": "Recepciones_Transferencia",
+    "Type": "Table",
+    "Position": 7,
+    "ShowIf": "OR(USERROLE(\"Administrador\"), USERROLE(\"Encargado\"))",
+    "Columns": [
+      "Orden_ID",
+      "Ingrediente_ID",
+      "Cantidad_Esperada",
+      "Cantidad_Recibida",
+      "Diferencia",
+      "Estado_Recepcion",
+      "Recibida_Por",
+      "Fecha_Recepcion",
+      "Requiere_Ajuste?",
+      "Ajuste_Generado_ID"
+    ],
+    "RowFilter": "OR(USERROLE(\"Administrador\"), [Orden_ID].[Sucursal_Destino_ID] = LOOKUP(USEREMAIL(), \"Usuarios_Sucursales\", \"Email\", \"Sucursal_ID\"))",
+    "OrderBy": "Fecha_Recepcion DESC",
+    "GroupBy": "Estado_Recepcion",
+    "Options": {
+      "ShowSearch": true,
+      "ShowSelect": true,
+      "AllowInlineEdit": false
+    }
+  },
+  {
+    "ViewName": "View_Transferencias_Dashboard_Admin",
+    "TableName": "Ordenes_Transferencia",
+    "Type": "Dashboard",
+    "Position": 8,
+    "ShowIf": "USERROLE(\"Administrador\")",
+    "Columns": [
+      "Estado",
+      "Sucursal_Origen_ID",
+      "Sucursal_Destino_ID",
+      "Fecha_Solicitud"
+    ],
+    "Options": {
+      "Charts": [
+        {
+          "Name": "Transferencias por Estado",
+          "Type": "Pie",
+          "Dimension": "Estado",
+          "Measure": "COUNT(*)"
+        },
+        {
+          "Name": "Transferencias Origen → Destino (Mes)",
+          "Type": "Bar",
+          "Dimension": "CONCATENATE([Sucursal_Origen_ID].[Codigo], \" → \", [Sucursal_Destino_ID].[Codigo])",
+          "Measure": "COUNT(*)",
+          "Filter": "MONTH([Fecha_Solicitud]) = MONTH(TODAY())"
+        },
+        {
+          "Name": "Tiempo promedio por estado (días)",
+          "Type": "Bar",
+          "Dimension": "Estado",
+          "Measure": "AVERAGE(HOUR([Updated_At] - [Fecha_Solicitud]) / 24)",
+          "Filter": "IN([Estado], LIST(\"Recibida_Completa\", \"Recibida_Con_Diferencias\"))"
+        }
+      ],
+      "KPIs": [
+        {
+          "Name": "Transferencias Pendientes Aprobación Origen",
+          "Expression": "COUNT(FILTER(\"Ordenes_Transferencia\", [Estado] = \"Solicitada\"))",
+          "Icon": "alert-circle",
+          "Color": "Warning"
+        },
+        {
+          "Name": "Transferencias Pendientes Aprobación Destino",
+          "Expression": "COUNT(FILTER(\"Ordenes_Transferencia\", [Estado] = \"Aprobada_Origen\"))",
+          "Icon": "alert-circle",
+          "Color": "Warning"
+        },
+        {
+          "Name": "Transferencias En Tránsito",
+          "Expression": "COUNT(FILTER(\"Ordenes_Transferencia\", IN([Estado], LIST(\"Despachada\", \"En_Transito\"))))",
+          "Icon": "truck",
+          "Color": "Info"
+        },
+        {
+          "Name": "Transferencias Con Diferencias (Mes)",
+          "Expression": "COUNT(FILTER(\"Ordenes_Transferencia\", AND([Estado] = \"Recibida_Con_Diferencias\", MONTH([Fecha_Recepcion]) = MONTH(TODAY()))))",
+          "Icon": "warning",
+          "Color": "Danger"
+        }
+      ]
+    }
+  }
+]

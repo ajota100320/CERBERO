@@ -1,0 +1,129 @@
+[
+  {
+    "ActionName": "Merma_Enviar_A_Revision",
+    "TableName": "Registro_de_Mermas_y_Vencimientos",
+    "Type": "App",
+    "Description": "Operador envía merma de Borrador a Pendiente para revisión del Encargado",
+    "Icon": "send",
+    "ShowIf": "AND([Estado_Merma] = \"Borrador\", USEREMAIL() = [Reportado_Por])",
+    "ActionType": "Data: set values in this row",
+    "NeedsConfirmation": true,
+    "ConfirmationMessage": "¿Enviar esta merma a revisión? El Encargado de tu sucursal la evaluará.",
+    "SetValues": [
+      {"Column": "Estado_Merma", "Value": "\"Pendiente\""},
+      {"Column": "Enviado_A_Revision_En", "Value": "NOW()"},
+      {"Column": "Enviado_A_Revision_Por", "Value": "USEREMAIL()"},
+      {"Column": "Sync_Pending?", "Value": "TRUE"}
+    ],
+    "RequiresSync": true
+  },
+  {
+    "ActionName": "Merma_Aprobar",
+    "TableName": "Registro_de_Mermas_y_Vencimientos",
+    "Type": "App",
+    "Description": "Encargado/Admin aprueba la merma → descuenta stock automáticamente (Bot posterior)",
+    "Icon": "check-circle",
+    "ShowIf": "AND(IN([Estado_Merma], LIST(\"Pendiente\", \"En_Revision\")), OR(USERROLE(\"Administrador\"), AND(USERROLE(\"Encargado\"), [Sucursal_ID] = LOOKUP(USEREMAIL(), \"Usuarios_Sucursales\", \"Email\", \"Sucursal_ID\"))))",
+    "ActionType": "Data: set values in this row",
+    "NeedsConfirmation": true,
+    "ConfirmationMessage": "¿Aprobar esta merma? Se descontará del stock de la sucursal.",
+    "SetValues": [
+      {"Column": "Estado_Merma", "Value": "\"Aprobada\""},
+      {"Column": "Aprobado_Por", "Value": "USEREMAIL()"},
+      {"Column": "Fecha_Aprobacion", "Value": "NOW()"},
+      {"Column": "Sync_Pending?", "Value": "TRUE"}
+    ],
+    "RequiresSync": true
+  },
+  {
+    "ActionName": "Merma_Rechazar",
+    "TableName": "Registro_de_Mermas_y_Vencimientos",
+    "Type": "App",
+    "Description": "Encargado/Admin rechaza la merma con motivo obligatorio",
+    "Icon": "x-circle",
+    "ShowIf": "AND(IN([Estado_Merma], LIST(\"Pendiente\", \"En_Revision\")), OR(USERROLE(\"Administrador\"), AND(USERROLE(\"Encargado\"), [Sucursal_ID] = LOOKUP(USEREMAIL(), \"Usuarios_Sucursales\", \"Email\", \"Sucursal_ID\"))))",
+    "ActionType": "Data: set values in this row",
+    "NeedsConfirmation": true,
+    "ConfirmationMessage": "¿Rechazar esta merma? Debes indicar el motivo para que el operador corrija.",
+    "SetValues": [
+      {"Column": "Estado_Merma", "Value": "\"Rechazada\""},
+      {"Column": "Rechazado_Por", "Value": "USEREMAIL()"},
+      {"Column": "Fecha_Rechazo", "Value": "NOW()"},
+      {"Column": "Sync_Pending?", "Value": "TRUE"}
+    ],
+    "RequiresSync": true,
+    "InputParameters": [
+      {"Name": "Motivo_Rechazo_Input", "Type": "LongText", "Required": true, "Prompt": "Motivo del rechazo (mín 10 caracteres)", "MinLength": 10}
+    ],
+    "SetValuesWithInputs": [
+      {"Column": "Motivo_Rechazo", "Value": "[Motivo_Rechazo_Input]"}
+    ]
+  },
+  {
+    "ActionName": "Merma_Solicitar_Correccion",
+    "TableName": "Registro_de_Mermas_y_Vencimientos",
+    "Type": "App",
+    "Description": "Encargado solicita corrección al operador (vuelve a Borrador con notas)",
+    "Icon": "edit",
+    "ShowIf": "AND(IN([Estado_Merma], LIST(\"Pendiente\", \"En_Revision\")), OR(USERROLE(\"Administrador\"), AND(USERROLE(\"Encargado\"), [Sucursal_ID] = LOOKUP(USEREMAIL(), \"Usuarios_Sucursales\", \"Email\", \"Sucursal_ID\"))))",
+    "ActionType": "Data: set values in this row",
+    "NeedsConfirmation": true,
+    "ConfirmationMessage": "¿Solicitar corrección? La merma volverá a Borrador para que el operador la ajuste.",
+    "SetValues": [
+      {"Column": "Estado_Merma", "Value": "\"Correccion_Solicitada\""},
+      {"Column": "Correccion_Solicitada_En", "Value": "NOW()"},
+      {"Column": "Veces_Reenviada", "Value": "[Veces_Reenviada] + 1"},
+      {"Column": "Sync_Pending?", "Value": "TRUE"}
+    ],
+    "RequiresSync": true,
+    "InputParameters": [
+      {"Name": "Correccion_Requerida", "Type": "LongText", "Required": true, "Prompt": "Qué debe corregir el operador (mín 10 caracteres)", "MinLength": 10}
+    ],
+    "SetValuesWithInputs": [
+      {"Column": "Motivo_Rechazo", "Value": "[Correccion_Requerida]"}
+    ]
+  },
+  {
+    "ActionName": "Merma_Reenviar_Despues_Correccion",
+    "TableName": "Registro_de_Mermas_y_Vencimientos",
+    "Type": "App",
+    "Description": "Operador reenvía merma corregida a revisión",
+    "Icon": "refresh",
+    "ShowIf": "AND([Estado_Merma] = \"Correccion_Solicitada\", USEREMAIL() = [Reportado_Por])",
+    "ActionType": "Data: set values in this row",
+    "NeedsConfirmation": true,
+    "ConfirmationMessage": "¿Reenviar merma corregida a revisión?",
+    "SetValues": [
+      {"Column": "Estado_Merma", "Value": "\"Pendiente\""},
+      {"Column": "Correccion_Realizada_En", "Value": "NOW()"},
+      {"Column": "Enviado_A_Revision_En", "Value": "NOW()"},
+      {"Column": "Enviado_A_Revision_Por", "Value": "USEREMAIL()"},
+      {"Column": "Sync_Pending?", "Value": "TRUE"}
+    ],
+    "RequiresSync": true
+  },
+  {
+    "ActionName": "Merma_Anular",
+    "TableName": "Registro_de_Mermas_y_Vencimientos",
+    "Type": "App",
+    "Description": "Solo Admin: anula merma (incluso aprobadas) con motivo",
+    "Icon": "ban",
+    "ShowIf": "AND(USERROLE(\"Administrador\"), IN([Estado_Merma], LIST(\"Aprobada\", \"Rechazada\", \"Correccion_Solicitada\")))",
+    "ActionType": "Data: set values in this row",
+    "NeedsConfirmation": true,
+    "ConfirmationMessage": "¿ANULAR esta merma? Si estaba Aprobada, NO revierte el stock automáticamente (requiere ajuste manual).",
+    "SetValues": [
+      {"Column": "Estado_Merma", "Value": "\"Anulada\""},
+      {"Column": "Anulada_Por", "Value": "USEREMAIL()"},
+      {"Column": "Fecha_Anulacion", "Value": "NOW()"},
+      {"Column": "Sync_Pending?", "Value": "TRUE"}
+    ],
+    "RequiresSync": true,
+    "InputParameters": [
+      {"Name": "Motivo_Anulacion_Input", "Type": "LongText", "Required": true, "Prompt": "Motivo de anulación (mín 10 caracteres)", "MinLength": 10}
+    ],
+    "SetValuesWithInputs": [
+      {"Column": "Motivo_Anulacion", "Value": "[Motivo_Anulacion_Input]"}
+    ]
+  }
+]

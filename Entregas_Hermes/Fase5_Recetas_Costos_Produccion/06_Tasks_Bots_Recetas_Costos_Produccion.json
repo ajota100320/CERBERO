@@ -1,0 +1,155 @@
+[
+  {
+    "TaskName": "Task_Notificar_Admin_Receta_En_Revision",
+    "Type": "Push Notification",
+    "Description": "Notifica a Admins cuando Encargado envía receta a revisión",
+    "TableName": "Recetas",
+    "Condition": "[_THISROW].[Estado] = \"En_Revision\" AND [_THISROW_BEFORE].[Estado] = \"Borrador\"",
+    "Recipients": "SELECT(Usuarios[Email], IN([Rol], LIST(\"Administrador\")))",
+    "Subject": "🔔 Receta en revisión: <<[Nombre]>> (Sucursal: <<[Sucursal_ID].[Nombre]>>)",
+    "Body": "El Encargado <<[Creado_Por]>> ha enviado a revisión la receta **<<[Nombre]>>** (<<[Rendimiento_Porciones]>> <<[Unidad_Rendimiento]>>).\n\n**Costo estimado/porción:** $<<[Costo_Por_Porciona]>>\n\nRevisar en App → Recetas → En Revisión.",
+    "Icon": "clipboard-check",
+    "Color": "Info"
+  },
+  {
+    "TaskName": "Task_Notificar_Encargado_Receta_Aprobada",
+    "Type": "Push Notification",
+    "Description": "Notifica a Encargado creador cuando Admin aprueba receta",
+    "TableName": "Recetas",
+    "Condition": "[_THISROW].[Estado] = \"Aprobada\" AND [_THISROW_BEFORE].[Estado] = \"En_Revision\"",
+    "Recipients": "[Creado_Por]",
+    "Subject": "✅ Receta APROBADA: <<[Nombre]>>",
+    "Body": "Tu receta **<<[Nombre]>>** ha sido aprobada por **<<[Aprobada_Por]>>**.\n\n**Costo final/porción:** $<<[Costo_Por_Porciona]>>\n**Versión:** <<[Version]>>\n\nYa está disponible para producción en tu sucursal.",
+    "Icon": "check-circle",
+    "Color": "Success"
+  },
+  {
+    "TaskName": "Task_Notificar_Encargado_Receta_Rechazada",
+    "Type": "Push Notification",
+    "Description": "Notifica a Encargado si Admin rechaza/vuelve a borrador",
+    "TableName": "Recetas",
+    "Condition": "[_THISROW].[Estado] = \"Borrador\" AND [_THISROW_BEFORE].[Estado] = \"En_Revision\"",
+    "Recipients": "[Creado_Por]",
+    "Subject": "↩️ Receta devuelta a borrador: <<[Nombre]>>",
+    "Body": "La receta **<<[Nombre]>>** fue devuelta a borrador por **<<[Aprobada_Por]>>**.\n\nRevisa observaciones y vuelve a enviar a revisión cuando esté lista.",
+    "Icon": "rotate-ccw",
+    "Color": "Warning"
+  },
+  {
+    "TaskName": "Task_Notificar_Encargado_Produccion_Iniciada",
+    "Type": "Push Notification",
+    "Description": "Notifica a Encargado cuando Operador inicia producción",
+    "TableName": "Produccion",
+    "Condition": "[_THISROW].[Estado] = \"En_Proceso\" AND [_THISROW_BEFORE].[Estado] <> \"En_Proceso\"",
+    "Recipients": "SELECT(Usuarios_Sucursales[Email], AND([Sucursal_ID] = [_THISROW].[Sucursal_ID], IN([Rol], LIST(\"Encargado\", \"Administrador\"))))",
+    "Subject": "🏭 Producción iniciada: <<[Receta_ID].[Nombre]>> (Lote: <<[Lote]>>)",
+    "Body": "**<<[Producida_Por]>>** inició producción de **<<[Receta_ID].[Nombre]>>**.\n\n**Cantidad:** <<[Cantidad_Producida]>> <<[Unidad_Produccion]>>\n**Lote:** <<[Lote]>>\n**Costo teórico:** $<<[Costo_Teorico_Total]>>\n\nMonitorear en App → Producción → En Proceso.",
+    "Icon": "factory",
+    "Color": "Info"
+  },
+  {
+    "TaskName": "Task_Notificar_Operador_Produccion_Lista_Para_Completar",
+    "Type": "Push Notification",
+    "Description": "Cuando todas las líneas de detalle tienen Cantidad_Real → notifica a operador para completar",
+    "TableName": "Produccion_Detalle",
+    "Condition": "AND([_THISROW].[Cantidad_Real] > 0, COUNT(FILTER(\"Produccion_Detalle\", AND([Produccion_ID] = [_THISROW].[Produccion_ID], [Cantidad_Real] = 0))) = 0)",
+    "Recipients": "[_THISROW].[Produccion_ID].[Producida_Por]",
+    "Subject": "✅ Ingredientes completados: <<[_THISROW].[Produccion_ID].[Receta_ID].[Nombre]>>",
+    "Body": "Todas las líneas de **<<[_THISROW].[Produccion_ID].[Receta_ID].[Nombre]>>** (Lote: <<[_THISROW].[Produccion_ID].[Lote]>>) tienen cantidad real registrada.\n\n**Próximo paso:** Abre la producción → Acción **\"Completar Producción\"**.\n\nEsto calculará costo real vs teórico y descargará stock.",
+    "Icon": "check-all",
+    "Color": "Success"
+  },
+  {
+    "TaskName": "Task_Verificar_Stock_Suficiente_Produccion",
+    "Type": "App: run a data action on a set of rows",
+    "Description": "Al iniciar producción, verifica stock teórico suficiente en Ingredientes_y_Stock",
+    "TableName": "Produccion",
+    "Condition": "[_THISROW].[Estado] = \"En_Proceso\" AND [_THISROW_BEFORE].[Estado] <> \"En_Proceso\"",
+    "ReferencedAction": "Action_Verificar_Stock_Produccion",
+    "ReferencedTable": "Receta_Ingredientes"
+  },
+  {
+    "TaskName": "Task_Verificar_Detalle_Completo_Produccion",
+    "Type": "App: run a data action on a set of rows",
+    "Description": "Acción interna para verificar completitud (usa Task_Notificar_Operador_Produccion_Lista_Para_Completar)",
+    "TableName": "Produccion_Detalle",
+    "Condition": "AND([_THISROW].[Cantidad_Real] > 0, COUNT(FILTER(\"Produccion_Detalle\", AND([Produccion_ID] = [_THISROW].[Produccion_ID], [Cantidad_Real] = 0))) = 0)",
+    "ReferencedAction": "Action_Nop",
+    "ReferencedTable": "Produccion_Detalle"
+  },
+  {
+    "TaskName": "Task_Generar_Historico_Costo_Ingrediente",
+    "Type": "App: add a row to a table",
+    "Description": "Crea registro en Costos_Historicos cuando cambia Costo_Actual de ingrediente",
+    "TableName": "Costos_Historicos",
+    "Condition": "[_THISROW].[Costo_Actual] <> [_THISROW_BEFORE].[Costo_Actual]",
+    "Values": {
+      "Entidad_Tipo": "\"Ingrediente\"",
+      "Entidad_ID": "[_THISROW].[Ingrediente_ID]",
+      "Sucursal_ID": "[_THISROW].[Sucursal_ID]",
+      "Costo_Anterior": "[_THISROW_BEFORE].[Costo_Actual]",
+      "Costo_Nuevo": "[_THISROW].[Costo_Actual]",
+      "Fuente_Cambio": "\"Actualizacion_Proveedor\"",
+      "Cambiado_Por": "USEREMAIL()",
+      "Fecha_Cambio": "NOW()",
+      "Aprobado_Por": "USEREMAIL()",
+      "Fecha_Aprobacion": "NOW()",
+      "Activo?": "TRUE",
+      "Sync_Pending?": "TRUE"
+    }
+  },
+  {
+    "TaskName": "Task_Alerta_Variacion_Costo_Critica",
+    "Type": "Push Notification",
+    "Description": "Alerta a Admin si variación de costo > umbral crítico (configurable)",
+    "TableName": "Ingredientes_y_Stock",
+    "Condition": "AND([_THISROW].[Costo_Actual] <> [_THISROW_BEFORE].[Costo_Actual], ABS(([_THISROW].[Costo_Actual] - [_THISROW_BEFORE].[Costo_Actual]) / [_THISROW_BEFORE].[Costo_Actual] * 100) > LOOKUP(\"UMBRAL_VARIACION_COSTO_CRITICA\", \"Config_Global\", \"Clave\", \"Valor\"))",
+    "Recipients": "SELECT(Usuarios[Email], [Rol] = \"Administrador\")",
+    "Subject": "🚨 ALERTA COSTO CRÍTICO: <<[Nombre]>> variación <<ROUND(ABS(([_THISROW].[Costo_Actual] - [_THISROW_BEFORE].[Costo_Actual]) / [_THISROW_BEFORE].[Costo_Actual] * 100), 1)>>%",
+    "Body": "El ingrediente **<<[Nombre]>>** (Sucursal: <<[Sucursal_ID].[Nombre]>>) cambió de costo:\n\n**Antes:** $<<[_THISROW_BEFORE].[Costo_Actual]>>\n**Ahora:** $<<[_THISROW].[Costo_Actual]>>\n**Variación:** <<ROUND(ABS(([_THISROW].[Costo_Actual] - [_THISROW_BEFORE].[Costo_Actual]) / [_THISROW_BEFORE].[Costo_Actual] * 100), 1)>>%\n\n**Fuente:** <<[_THISROW].[Fuente_Ultimo_Cambio]>>\n\nRevisar recetas afectadas y aprobar/recalcular.",
+    "Icon": "alert-triangle",
+    "Color": "Danger"
+  },
+  {
+    "TaskName": "Task_Recalcular_Recetas_Afectadas",
+    "Type": "App: run a data action on a set of rows",
+    "Description": "Recalcula Costo_Total_Receta y Costo_Por_Porciona de recetas que usan este ingrediente",
+    "TableName": "Receta_Ingredientes",
+    "Condition": "[Ingrediente_ID] = [_THISROW].[Ingrediente_ID]",
+    "ReferencedAction": "Action_Recalcular_Costo_Receta",
+    "ReferencedTable": "Recetas"
+  },
+  {
+    "TaskName": "Task_Recalcular_Costos_Recetas_Diario",
+    "Type": "App: run a data action on a set of rows",
+    "Description": "Job diario 08:00 - recalcula costos de todas las recetas aprobadas",
+    "TableName": "Recetas",
+    "Condition": "[Estado] = \"Aprobada\" AND [Es_Activa?] = TRUE",
+    "ReferencedAction": "Action_Recalcular_Costo_Receta",
+    "ReferencedTable": "Recetas"
+  },
+  {
+    "TaskName": "Task_Reporte_Variaciones_Costos_Diario",
+    "Type": "Push Notification",
+    "Description": "Resumen diario de variaciones de costo significativas a Admins",
+    "TableName": "Costos_Historicos",
+    "Condition": "AND([Fecha_Cambio] >= TODAY() - 1, [Variacion_Porcentaje] <> 0, ABS([Variacion_Porcentaje]) > 2)",
+    "Recipients": "SELECT(Usuarios[Email], [Rol] = \"Administrador\")",
+    "Subject": "📊 Reporte diario variaciones de costo (<<TODAY()>>)",
+    "Body": "Se detectaron <<COUNT(FILTER(\"Costos_Historicos\", AND([Fecha_Cambio] >= TODAY() - 1, ABS([Variacion_Porcentaje]) > 2))))>> variaciones > 2% en últimas 24h.\n\n**Top 5:**\n<<LIST(FILTER(\"Costos_Historicos\", AND([Fecha_Cambio] >= TODAY() - 1, ABS([Variacion_Porcentaje]) > 2)), CONCATENATE([Entidad_Tipo], \" \", [Entidad_ID].[Nombre], \": \", ROUND([Variacion_Porcentaje], 1), \"%\"))>>\n\nVer App → Costos Históricos para detalle.",
+    "Icon": "trending-up",
+    "Color": "Info"
+  },
+  {
+    "TaskName": "Task_Alerta_Produccion_Estancada",
+    "Type": "Push Notification",
+    "Description": "Diario 09:00 - alerta producciones en En_Proceso > 24h",
+    "TableName": "Produccion",
+    "Condition": "AND([Estado] = \"En_Proceso\", HOUR(NOW() - [Fecha_Creacion]) > 24)",
+    "Recipients": "SELECT(Usuarios_Sucursales[Email], AND([Sucursal_ID] = [_THISROW].[Sucursal_ID], IN([Rol], LIST(\"Encargado\", \"Administrador\"))))",
+    "Subject": "⏰ Producción estancada >24h: <<[Receta_ID].[Nombre]>> (Lote: <<[Lote]>>)",
+    "Body": "La producción **<<[Receta_ID].[Nombre]>>** (Lote: <<[Lote]>>) lleva **<<ROUND(HOUR(NOW() - [Fecha_Creacion]), 0)>> horas** en \"En Proceso\".\n\n**Iniciada por:** <<[Producida_Por]>> el <<FORMAT([Fecha_Creacion], \"DD/MM HH:mm\")>>\n\n**Acción requerida:** Completar, cancelar o registrar diferenciales.",
+    "Icon": "clock-alert",
+    "Color": "Warning"
+  }
+]

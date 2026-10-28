@@ -1,0 +1,8 @@
+Receta_Ing_ID,Receta_ID,Ingrediente_ID,Cantidad,Unidad_Medida,Merma_Porcentaje,Costo_Unitario_Snapshot,Costo_Total_Linea,Es_Opcional,Orden,Fecha_Creacion,Creado_Por,Sync_Pending?
+RI_001,REC_001,[Ingrediente_ID_Carne],1.5,"Kg",5,,0,FALSE,1,NOW(),USEREMAIL(),TRUE
+RI_002,REC_001,[Ingrediente_ID_Pan],10,"Unidades",0,,0,FALSE,2,NOW(),USEREMAIL(),TRUE
+RI_003,REC_001,[Ingrediente_ID_Queso],0.5,"Kg",2,,0,FALSE,3,NOW(),USEREMAIL(),TRUE
+RI_004,REC_001,[Ingrediente_ID_Lechuga],0.3,"Kg",10,,0,FALSE,4,NOW(),USEREMAIL(),TRUE
+RI_005,REC_001,[Ingrediente_ID_Tomate],0.4,"Kg",8,,0,FALSE,5,NOW(),USEREMAIL(),TRUE
+RI_006,REC_002,[Ingrediente_ID_Papa],5,"Kg",15,,0,FALSE,1,NOW(),USEREMAIL(),TRUE
+RI_007,REC_002,[Ingrediente_ID_Aceite],2,"Litros",5,,0,FALSE,2,NOW(),USEREMAIL(),TRUE

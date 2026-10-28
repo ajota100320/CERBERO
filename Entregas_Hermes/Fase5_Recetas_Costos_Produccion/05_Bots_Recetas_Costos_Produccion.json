@@ -1,0 +1,91 @@
+[
+  {
+    "BotName": "Bot_Receta_Flujo_Estados",
+    "Description": "Notificaciones y acciones en transiciones de estado de recetas",
+    "TableName": "Recetas",
+    "Trigger": {
+      "Type": "DataChange",
+      "Columns": ["Estado"]
+    },
+    "Process": {
+      "Type": "RunTask",
+      "Tasks": [
+        "Task_Notificar_Admin_Receta_En_Revision",
+        "Task_Notificar_Encargado_Receta_Aprobada",
+        "Task_Notificar_Encargado_Receta_Rechazada"
+      ]
+    }
+  },
+  {
+    "BotName": "Bot_Produccion_Flujo",
+    "Description": "Gestiona notificaciones y stock en producción",
+    "TableName": "Produccion",
+    "Trigger": {
+      "Type": "DataChange",
+      "Columns": ["Estado"]
+    },
+    "Process": {
+      "Type": "RunTask",
+      "Tasks": [
+        "Task_Notificar_Encargado_Produccion_Iniciada",
+        "Task_Notificar_Operador_Produccion_Lista_Para_Completar",
+        "Task_Verificar_Stock_Suficiente_Produccion"
+      ]
+    }
+  },
+  {
+    "BotName": "Bot_Produccion_Detalle_Completo",
+    "Description": "Cuando todas las líneas de detalle tienen Cantidad_Real → sugiere completar",
+    "TableName": "Produccion_Detalle",
+    "Trigger": {
+      "Type": "DataChange",
+      "Columns": ["Cantidad_Real"]
+    },
+    "Process": {
+      "Type": "RunTask",
+      "Tasks": [
+        "Task_Verificar_Detalle_Completo_Produccion"
+      ]
+    }
+  },
+  {
+    "BotName": "Bot_Costo_Ingrediente_Cambio",
+    "Description": "Cuando cambia Costo_Actual en Ingredientes_y_Stock → genera histórico + alerta si variación > umbral",
+    "TableName": "Ingredientes_y_Stock",
+    "Trigger": {
+      "Type": "DataChange",
+      "Columns": ["Costo_Actual"]
+    },
+    "Process": {
+      "Type": "RunTask",
+      "Tasks": [
+        "Task_Generar_Historico_Costo_Ingrediente",
+        "Task_Alerta_Variacion_Costo_Critica",
+        "Task_Recalcular_Recetas_Afectadas"
+      ]
+    }
+  },
+  {
+    "BotName": "Bot_Costo_Receta_Variacion_Diaria",
+    "Description": "Diario 08:00 → recalcula costos de recetas aprobadas y alerta variaciones significativas",
+    "Schedule": "0 8 * * *",
+    "Process": {
+      "Type": "RunTask",
+      "Tasks": [
+        "Task_Recalcular_Costos_Recetas_Diario",
+        "Task_Reporte_Variaciones_Costos_Diario"
+      ]
+    }
+  },
+  {
+    "BotName": "Bot_Produccion_Vencida_Sin_Completar",
+    "Description": "Diario 09:00 → alerta producciones en En_Proceso > 24h sin completar",
+    "Schedule": "0 9 * * *",
+    "Process": {
+      "Type": "RunTask",
+      "Tasks": [
+        "Task_Alerta_Produccion_Estancada"
+      ]
+    }
+  }
+]

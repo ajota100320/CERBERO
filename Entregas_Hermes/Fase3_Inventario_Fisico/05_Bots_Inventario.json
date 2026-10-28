@@ -1,0 +1,55 @@
+[
+  {
+    "BotName": "Bot_Conteo_Iniciado_Notificar_Operadores",
+    "Description": "Notifica a operadores asignados cuando Encargado inicia un conteo",
+    "TableName": "Conteos_Inventario",
+    "TriggerType": "Data change",
+    "TriggerCondition": "[_THISROW_BEFORE].[Estado] = \"Borrador\" AND [_THISROW].[Estado] = \"En_Progreso\"",
+    "Tasks": [
+      "Task_Notificar_Operadores_Conteo_Iniciado"
+    ]
+  },
+  {
+    "BotName": "Bot_Conteo_Completado_Generar_Ajustes",
+    "Description": "Cuando Encargado aprueba conteo, genera ajustes y alerta si hay diferencias fuera de tolerancia",
+    "TableName": "Conteos_Inventario",
+    "TriggerType": "Data change",
+    "TriggerCondition": "IN([_THISROW_BEFORE].[Estado], LIST(\"Completado\", \"Con_Diferencias\")) AND IN([_THISROW].[Estado], LIST(\"Aprobado\", \"Aplicado\"))",
+    "Tasks": [
+      "Task_Generar_Ajustes_Desde_Conteo",
+      "Task_Alerta_Diferencias_Criticas_Admin"
+    ]
+  },
+  {
+    "BotName": "Bot_Ajuste_Aplicado_Actualizar_Stock_Merma",
+    "Description": "Al aplicar ajuste, actualiza stock en Ingredientes_y_Stock y genera merma automática si es negativa",
+    "TableName": "Ajustes_Inventario",
+    "TriggerType": "Data change",
+    "TriggerCondition": "[_THISROW_BEFORE].[Estado] = \"Aprobado\" AND [_THISROW].[Estado] = \"Aplicado\"",
+    "Tasks": [
+      "Task_Aplicar_Ajuste_Stock_Ingrediente",
+      "Task_Crear_Merma_Automatica_Si_Negativo"
+    ]
+  },
+  {
+    "BotName": "Bot_Conteo_Vencido_Sin_Iniciar",
+    "Description": "Alerta diaria a Encargados de conteos programados que no se iniciaron",
+    "TableName": "Conteos_Inventario",
+    "TriggerType": "Scheduled",
+    "Schedule": "Daily at 09:00",
+    "TriggerCondition": "FILTER(\"Conteos_Inventario\", AND([Estado] = \"Borrador\", [Fecha_Programada] <= TODAY(), [Fecha_Programada] >= TODAY() - 7))",
+    "Tasks": [
+      "Task_Alerta_Conteo_Vencido_Encargado"
+    ]
+  },
+  {
+    "BotName": "Bot_Item_Fuera_Tolerancia_Alerta_Inmediata",
+    "Description": "Notificación inmediata al Encargado cuando operador registra item fuera de tolerancia",
+    "TableName": "Items_Conteo",
+    "TriggerType": "Data change",
+    "TriggerCondition": "[_THISROW].[Esta_Fuera_Tolerancia?] = TRUE AND [_THISROW_BEFORE].[Esta_Fuera_Tolerancia?] = FALSE",
+    "Tasks": [
+      "Task_Alerta_Item_Fuera_Tolerancia_Encargado"
+    ]
+  }
+]

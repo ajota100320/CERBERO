@@ -1,0 +1,48 @@
+[
+  {
+    "BotName": "Bot_Transferencia_Flujo_Estados",
+    "Description": "Gestiona notificaciones y acciones automáticas en cada transición de estado de transferencia",
+    "TableName": "Ordenes_Transferencia",
+    "TriggerType": "Data change",
+    "TriggerCondition": "IN([_THISROW].[Estado], LIST(\"Solicitada\", \"Aprobada_Origen\", \"Aprobada_Destino\", \"En_Preparacion\", \"Despachada\", \"En_Transito\", \"Recibida_Completa\", \"Recibida_Con_Diferencias\", \"Cancelada\")) AND [_THISROW_BEFORE].[Estado] <> [_THISROW].[Estado]",
+    "Tasks": [
+      "Task_Notificar_Destino_Solicitud",
+      "Task_Notificar_Origen_Aprobacion_Destino",
+      "Task_Notificar_Preparacion_Iniciada",
+      "Task_Notificar_Despacho_Realizado",
+      "Task_Notificar_Recepcion_Completa",
+      "Task_Alerta_Diferencias_Recepcion"
+    ]
+  },
+  {
+    "BotName": "Bot_Transferencia_Items_Preparados",
+    "Description": "Cuando todos los items están preparados, notifica a Encargado origen para despachar",
+    "TableName": "Items_Transferencia",
+    "TriggerType": "Data change",
+    "TriggerCondition": "AND([_THISROW].[Estado_Item] = \"Preparado\", COUNT(FILTER(\"Items_Transferencia\", AND([Orden_ID] = [_THISROW].[Orden_ID], [Estado_Item] <> \"Preparado\"))) = 0)",
+    "Tasks": [
+      "Task_Notificar_Todos_Preparados_Despachar"
+    ]
+  },
+  {
+    "BotName": "Bot_Transferencia_Vencida_Sin_Accion",
+    "Description": "Alerta diaria a Encargados de transferencias estancadas > 24h sin avance",
+    "TableName": "Ordenes_Transferencia",
+    "TriggerType": "Scheduled",
+    "Schedule": "Daily at 09:00",
+    "TriggerCondition": "FILTER(\"Ordenes_Transferencia\", AND(IN([Estado], LIST(\"Solicitada\", \"Aprobada_Origen\", \"Aprobada_Destino\", \"En_Preparacion\")), HOUR(NOW() - [Updated_At]) >= 24))",
+    "Tasks": [
+      "Task_Alerta_Transferencia_Estancada"
+    ]
+  },
+  {
+    "BotName": "Bot_Recepcion_Diferencias_Criticas",
+    "Description": "Alerta inmediata a Admin si recepción tiene diferencias > umbral crítico",
+    "TableName": "Recepciones_Transferencia",
+    "TriggerType": "Data change",
+    "TriggerCondition": "AND([_THISROW].[Estado_Recepcion] = \"Con_Diferencias\", ABS([_THISROW].[Diferencia]) > LOOKUP(\"UMBRAL_DIFERENCIA_TRANSFERENCIA_CRITICA\", \"Config_Global\", \"Clave\", \"Valor\"))",
+    "Tasks": [
+      "Task_Alerta_Diferencia_Critica_Transferencia_Admin"
+    ]
+  }
+]

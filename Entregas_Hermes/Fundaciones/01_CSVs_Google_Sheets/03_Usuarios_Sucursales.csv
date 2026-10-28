@@ -1,0 +1,3 @@
+ID,Usuario_Email,Sucursal_ID,Rol_Sucursal,Activo?,Fecha_Asignacion,Asignado_Por,Notas
+UNIQUEID(),,,,"Operador",TRUE,NOW(),USEREMAIL(),
+UNIQUEID(),,,,"Operador",TRUE,NOW(),USEREMAIL(),

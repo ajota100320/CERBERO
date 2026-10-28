@@ -1,0 +1,9 @@
+Cap_Usu_ID,Capac_ID,Usuario_ID,Sucursal_ID,Estado,Fecha_Asignacion,Fecha_Vencimiento,Fecha_Completado,Puntuacion_Examen,Observaciones,Es_Recurrente?,Fecha_Proxima_Renovacion,Fecha_Creacion,Creado_Por,Sync_Pending?
+CU_001,CAP_001,"operador1a@test.com",[Sucursal_ID_Suc1],"Completada",TODAY()-60,TODAY()+300,TODAY()-45,92,"Excelente",TRUE,TODAY()+300,NOW(),USEREMAIL(),TRUE
+CU_002,CAP_001,"operador1b@test.com",[Sucursal_ID_Suc1],"Completada",TODAY()-60,TODAY()+300,TODAY()-40,88,"Bien",TRUE,TODAY()+300,NOW(),USEREMAIL(),TRUE
+CU_003,CAP_001,"operador2a@test.com",[Sucursal_ID_Suc2],"Pendiente",TODAY()-10,TODAY()+20,,,,"",TRUE,TODAY()+20,NOW(),USEREMAIL(),TRUE
+CU_004,CAP_002,"operador1a@test.com",[Sucursal_ID_Suc1],"Completada",TODAY()-30,TODAY()+150,TODAY()-20,, "Presencial completada",TRUE,TODAY()+150,NOW(),USEREMAIL(),TRUE
+CU_005,CAP_002,"encargado1@test.com",[Sucursal_ID_Suc1],"En_Progreso",TODAY()-15,TODAY()+15,,,,"",TRUE,,NOW(),USEREMAIL(),TRUE
+CU_006,CAP_003,"operador1a@test.com",[Sucursal_ID_Suc1],"Pendiente",TODAY()-5,TODAY()+5,,,,"",TRUE,TODAY()+5,NOW(),USEREMAIL(),TRUE
+CU_007,CAP_004,"operador1b@test.com",[Sucursal_ID_Suc1],"Completada",TODAY()-20,TODAY()+160,TODAY()-15,95,"Dominio app",TRUE,TODAY()+160,NOW(),USEREMAIL(),TRUE
+CU_008,CAP_006,"operador2a@test.com",[Sucursal_ID_Suc2],"Pendiente",TODAY()-5,TODAY()+10,,,,"",TRUE,TODAY()+10,NOW(),USEREMAIL(),TRUE

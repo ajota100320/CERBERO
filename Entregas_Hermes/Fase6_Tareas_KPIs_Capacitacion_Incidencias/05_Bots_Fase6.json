@@ -1,0 +1,126 @@
+[
+  {
+    "BotName": "Bot_Tarea_Programada_Recordatorios",
+    "Description": "Notifica a responsables antes de ventana de ejecución (Notificar_Antes_Min)",
+    "Schedule": "*/15 * * * *",
+    "Process": {
+      "Type": "RunTask",
+      "Tasks": [
+        "Task_Notificar_Tarea_Proxima"
+      ]
+    }
+  },
+  {
+    "BotName": "Bot_Tarea_Vencida_Sin_Ejecutar",
+    "Description": "Detecta tareas programadas que pasaron su ventana sin ejecutarse",
+    "Schedule": "0 6 * * *",
+    "Process": {
+      "Type": "RunTask",
+      "Tasks": [
+        "Task_Detectar_Tareas_Vencidas",
+        "Task_Generar_Incidencia_Tarea_Omitida"
+      ]
+    }
+  },
+  {
+    "BotName": "Bot_Tarea_Ejecucion_Flujo",
+    "Description": "Gestiona transiciones de estado en ejecuciones de tarea",
+    "TableName": "Tarea_Ejecuciones",
+    "Trigger": {
+      "Type": "DataChange",
+      "Columns": ["Estado"]
+    },
+    "Process": {
+      "Type": "RunTask",
+      "Tasks": [
+        "Task_Notificar_Incidencia_Auto_Desde_Tarea",
+        "Task_Actualizar_KPI_Cumplimiento_Tareas"
+      ]
+    }
+  },
+  {
+    "BotName": "Bot_Incidencia_Flujo_Estados",
+    "Description": "SLA, escalaciones y notificaciones en ciclo de vida de incidencia",
+    "TableName": "Incidencias",
+    "Trigger": {
+      "Type": "DataChange",
+      "Columns": ["Estado"]
+    },
+    "Process": {
+      "Type": "RunTask",
+      "Tasks": [
+        "Task_Notificar_Nueva_Incidencia",
+        "Task_Notificar_Asignacion_Incidencia",
+        "Task_Notificar_Escalacion_Incidencia",
+        "Task_Notificar_Resolucion_Incidencia"
+      ]
+    }
+  },
+  {
+    "BotName": "Bot_Incidencia_SLA_Vencido",
+    "Description": "Cada 30 min verifica SLA y escala automáticamente",
+    "Schedule": "*/30 * * * *",
+    "Process": {
+      "Type": "RunTask",
+      "Tasks": [
+        "Task_Verificar_SLA_Incidencias",
+        "Task_Escalar_SLA_Vencido"
+      ]
+    }
+  },
+  {
+    "BotName": "Bot_KPI_Calculo_Programado",
+    "Description": "Calcula KPIs según su frecuencia configurada",
+    "Schedule": "0 7 * * *",
+    "Process": {
+      "Type": "RunTask",
+      "Tasks": [
+        "Task_Calcular_KPIs_Diarios",
+        "Task_Calcular_KPIs_Semanales_Lunes",
+        "Task_Calcular_KPIs_Mensuales_Primero"
+      ]
+    }
+  },
+  {
+    "BotName": "Bot_KPI_Alertas_Umbrales",
+    "Description": "Alerta cuando KPI cruza umbrales (Verde→Amarillo→Rojo)",
+    "TableName": "Registros_KPI",
+    "Trigger": {
+      "Type": "DataChange",
+      "Columns": ["Estado_KPI"]
+    },
+    "Process": {
+      "Type": "RunTask",
+      "Tasks": [
+        "Task_Alerta_KPI_Cambio_Estado"
+      ]
+    }
+  },
+  {
+    "BotName": "Bot_Capacitaciones_Vencimiento",
+    "Description": "Diario 08:00 - alerta capacitaciones próximas a vencer / vencidas",
+    "Schedule": "0 8 * * *",
+    "Process": {
+      "Type": "RunTask",
+      "Tasks": [
+        "Task_Alerta_Capacitacion_Proxima_Vencer",
+        "Task_Marcar_Capacitacion_Vencida"
+      ]
+    }
+  },
+  {
+    "BotName": "Bot_Capacitaciones_Renovacion_Automatica",
+    "Description": "Al completar capacitación recurrente, crea la siguiente asignación automáticamente",
+    "TableName": "Capacitaciones_Usuarios",
+    "Trigger": {
+      "Type": "DataChange",
+      "Columns": ["Estado"]
+    },
+    "Process": {
+      "Type": "RunTask",
+      "Tasks": [
+        "Task_Renovar_Capacitacion_Completada"
+      ]
+    }
+  }
+]

@@ -1,0 +1,3 @@
+Ajuste_ID,Conteo_ID,Item_ID,Ingrediente_ID,Sucursal_ID,Stock_Anterior,Stock_Nuevo,Diferencia_Ajuste,Tipo_Ajuste,Aprobado_Por,Fecha_Aprobacion,Estado,Genero_Merma_Auto?,Merma_ID_Generada,Fecha_Creacion,Creado_Por,Sync_Pending?
+AJS_001,CNT_001,ITM_002,[Ingrediente_ID_2],[Sucursal_ID_Suc1],50,45,-5,"Merma_Automatica","encargado1@test.com",NOW(),"Aplicado",TRUE,"MRM_AUTO_001",NOW(),USEREMAIL(),TRUE
+AJS_002,CNT_001,ITM_003,[Ingrediente_ID_3],[Sucursal_ID_Suc1],200,202,2,"Ajuste_Positivo","encargado1@test.com",NOW(),"Aplicado",FALSE,,NOW(),USEREMAIL(),TRUE

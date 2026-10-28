@@ -1,0 +1,403 @@
+[
+  {
+    "ActionName": "Tarea_Crear_Nueva",
+    "Type": "App: go to a view within this app",
+    "Description": "Abre formulario para crear nueva tarea (Encargado/Admin)",
+    "TableName": "Tareas",
+    "Icon": "add-circle",
+    "ShowIf": "OR(USERROLE(\"Administrador\"), USERROLE(\"Encargado\"))",
+    "TargetView": "View_Tarea_Formulario_Nueva"
+  },
+  {
+    "ActionName": "Tarea_Programar",
+    "Type": "App: go to a view within this app",
+    "Description": "Abre formulario para programar tarea recurrente",
+    "TableName": "Tareas",
+    "Icon": "calendar-plus",
+    "ShowIf": "OR(USERROLE(\"Administrador\"), AND(USERROLE(\"Encargado\"), [Sucursal_ID] = LOOKUP(USEREMAIL(), \"Usuarios_Sucursales\", \"Email\", \"Sucursal_ID\")))",
+    "TargetView": "View_Tarea_Programacion_Formulario"
+  },
+  {
+    "ActionName": "Tarea_Ejecutar_Iniciar",
+    "Type": "Data: add a new row to a table",
+    "Description": "Operador inicia ejecución de tarea programada",
+    "TableName": "Tarea_Ejecuciones",
+    "ShowIf": "AND([Estado] = \"Pendiente\", OR(USERROLE(\"Operador\"), USERROLE(\"Encargado\"), USERROLE(\"Administrador\")))",
+    "InitialValues": {
+      "Prog_ID": "[_THISROW].[Prog_ID]",
+      "Tarea_ID": "[_THISROW].[Tarea_ID]",
+      "Sucursal_ID": "[_THISROW].[Sucursal_ID]",
+      "Ejecutada_Por": "USEREMAIL()",
+      "Fecha_Ejecucion": "TODAY()",
+      "Hora_Inicio": "TIME(NOW())",
+      "Estado": "\"En_Proceso\"",
+      "Sync_Pending?": "TRUE"
+    }
+  },
+  {
+    "ActionName": "Tarea_Ejecutar_Completar",
+    "Type": "Data: set column values",
+    "Description": "Operador completa ejecución con checklist y evidencia",
+    "TableName": "Tarea_Ejecuciones",
+    "ShowIf": "AND([Estado] = \"En_Proceso\", [Ejecutada_Por] = USEREMAIL())",
+    "Columns": [
+      "Hora_Fin",
+      "Duracion_Real_Min",
+      "Estado",
+      "Checklist_Respuestas_JSON",
+      "Evidencia_Fotos",
+      "Observaciones",
+      "Sync_Pending?"
+    ],
+    "Values": [
+      "TIME(NOW())",
+      "([Hora_Fin] - [Hora_Inicio]) * 60",
+      "IF([Incidencia_Generada?] = TRUE, \"Con_Incidencia\", \"Completada\")",
+      "",
+      "",
+      "",
+      "TRUE"
+    ],
+    "InputParameters": [
+      {
+        "Name": "Checklist_Respuestas",
+        "Type": "LongText",
+        "Required": true,
+        "Prompt": "Respuestas del checklist (JSON)"
+      },
+      {
+        "Name": "Evidencia_Fotos",
+        "Type": "Image",
+        "Required": false,
+        "Prompt": "Foto evidencia (opcional)"
+      },
+      {
+        "Name": "Observaciones",
+        "Type": "LongText",
+        "Required": false,
+        "Prompt": "Observaciones finales"
+      }
+    ],
+    "SetValuesWithInputs": [
+      {
+        "Column": "Checklist_Respuestas_JSON",
+        "Value": "[Checklist_Respuestas]"
+      },
+      {
+        "Column": "Evidencia_Fotos",
+        "Value": "[Evidencia_Fotos]"
+      },
+      {
+        "Column": "Observaciones",
+        "Value": "[Observaciones]"
+      }
+    ]
+  },
+  {
+    "ActionName": "Tarea_Ejecutar_Omitir",
+    "Type": "Data: set column values",
+    "Description": "Operador omite tarea (con justificación obligatoria)",
+    "TableName": "Tarea_Ejecuciones",
+    "ShowIf": "AND([Estado] = \"Pendiente\", OR(USERROLE(\"Operador\"), USERROLE(\"Encargado\"), USERROLE(\"Administrador\")))",
+    "Columns": [
+      "Estado",
+      "Observaciones",
+      "Sync_Pending?"
+    ],
+    "Values": [
+      "\"Omitida\"",
+      "",
+      "TRUE"
+    ],
+    "InputParameters": [
+      {
+        "Name": "Justificacion",
+        "Type": "LongText",
+        "Required": true,
+        "Prompt": "Justificación obligatoria para omitir (mín 20 caracteres)",
+        "MinLength": 20
+      }
+    ],
+    "SetValuesWithInputs": [
+      {
+        "Column": "Observaciones",
+        "Value": "CONCATENATE(\"OMITIDA: \", [Justificacion], \" - \", NOW())"
+      }
+    ]
+  },
+  {
+    "ActionName": "Incidencia_Reportar_Desde_Tarea",
+    "Type": "Data: add a new row to a table",
+    "Description": "Genera incidencia automática desde ejecución de tarea fallida",
+    "TableName": "Incidencias",
+    "ShowIf": "[Incidencia_Generada?] = TRUE",
+    "InitialValues": {
+      "Titulo": "CONCATENATE(\"Incidencia auto: \", [_THISROW].[Tarea_ID].[Nombre])",
+      "Tipo": "Mantenimiento",
+      "Severidad": "Media",
+      "Descripcion": "CONCATENATE(\"Generada automáticamente desde ejecución de tarea \\\"\", [_THISROW].[Tarea_ID].[Nombre], \"\\\" (Prog: \", [_THISROW].[Prog_ID], \"). \", [_THISROW].[Observaciones])",
+      "Sucursal_ID": "[_THISROW].[Sucursal_ID]",
+      "Reportada_Por": "[_THISROW].[Ejecutada_Por]",
+      "Asignada_A": "SELECT(Usuarios_Sucursales[Email], AND([Sucursal_ID] = [_THISROW].[Sucursal_ID], IN([Rol], LIST(\"Encargado\", \"Administrador\"))))",
+      "Fecha_Reporte": "NOW()",
+      "SLA_Horas": "4",
+      "Origen_Incidencia": "\"Tarea_Ejecucion\"",
+      "Evidencia_Inicial": "[_THISROW].[Evidencia_Fotos]",
+      "Sync_Pending?": "TRUE"
+    }
+  },
+  {
+    "ActionName": "Incidencia_Reportar_Manual",
+    "Type": "App: go to a view within this app",
+    "Description": "Abre formulario para reportar incidencia manual (Todos roles)",
+    "TableName": "Incidencias",
+    "Icon": "alert-triangle",
+    "ShowIf": "OR(USERROLE(\"Administrador\"), USERROLE(\"Encargado\"), USERROLE(\"Operador\"))",
+    "TargetView": "View_Incidencia_Formulario_Nueva"
+  },
+  {
+    "ActionName": "Incidencia_Asignar",
+    "Type": "Data: set column values",
+    "Description": "Encargado/Admin asigna incidencia a responsable",
+    "TableName": "Incidencias",
+    "ShowIf": "AND([Estado] = \"Abierta\", OR(USERROLE(\"Administrador\"), USERROLE(\"Encargado\")))",
+    "Columns": [
+      "Asignada_A",
+      "Fecha_Asignacion",
+      "Estado",
+      "Tiempo_Respuesta_Horas",
+      "Sync_Pending?"
+    ],
+    "Values": [
+      "",
+      "NOW()",
+      "\"En_Proceso\"",
+      "([Fecha_Asignacion] - [Fecha_Reporte]) * 24",
+      "TRUE"
+    ],
+    "InputParameters": [
+      {
+        "Name": "Responsable",
+        "Type": "Text",
+        "Required": true,
+        "Prompt": "Email del responsable (debe ser de la misma sucursal)"
+      }
+    ],
+    "SetValuesWithInputs": [
+      {
+        "Column": "Asignada_A",
+        "Value": "[Responsable]"
+      }
+    ]
+  },
+  {
+    "ActionName": "Incidencia_Escalar",
+    "Type": "Data: set column values",
+    "Description": "Escala incidencia a Admin (desde Encargado)",
+    "TableName": "Incidencias",
+    "ShowIf": "AND(IN([Estado], LIST(\"Abierta\", \"En_Proceso\")), USERROLE(\"Encargado\"))",
+    "Columns": [
+      "Estado",
+      "Asignada_A",
+      "Fecha_Asignacion",
+      "Sync_Pending?"
+    ],
+    "Values": [
+      "\"Escalada\"",
+      "SELECT(Usuarios[Email], [Rol] = \"Administrador\")",
+      "NOW()",
+      "TRUE"
+    ]
+  },
+  {
+    "ActionName": "Incidencia_Resolver",
+    "Type": "Data: set column values",
+    "Description": "Responsable marca como resuelta con solución",
+    "TableName": "Incidencias",
+    "ShowIf": "AND([Estado] = \"En_Proceso\", OR([Asignada_A] = USEREMAIL(), USERROLE(\"Administrador\")))",
+    "Columns": [
+      "Estado",
+      "Solucion",
+      "Fecha_Cierre",
+      "Tiempo_Resolucion_Horas",
+      "Sync_Pending?"
+    ],
+    "Values": [
+      "\"Resuelta\"",
+      "",
+      "NOW()",
+      "([Fecha_Cierre] - [Fecha_Reporte]) * 24",
+      "TRUE"
+    ],
+    "InputParameters": [
+      {
+        "Name": "Solucion_Aplicada",
+        "Type": "LongText",
+        "Required": true,
+        "Prompt": "Describe la solución aplicada (mín 20 caracteres)",
+        "MinLength": 20
+      }
+    ],
+    "SetValuesWithInputs": [
+      {
+        "Column": "Solucion",
+        "Value": "[Solucion_Aplicada]"
+      }
+    ]
+  },
+  {
+    "ActionName": "Incidencia_Cerrar",
+    "Type": "Data: set column values",
+    "Description": "Admin/Encargado valida y cierra incidencia",
+    "TableName": "Incidencias",
+    "ShowIf": "AND([Estado] = \"Resuelta\", OR(USERROLE(\"Administrador\"), USERROLE(\"Encargado\")))",
+    "Columns": [
+      "Estado",
+      "Sync_Pending?"
+    ],
+    "Values": [
+      "\"Cerrada\"",
+      "TRUE"
+    ]
+  },
+  {
+    "ActionName": "Capacitacion_Asignar_Usuario",
+    "Type": "Data: add a new row to a table",
+    "Description": "Admin/Encargado asigna capacitación a usuario(s)",
+    "TableName": "Capacitaciones_Usuarios",
+    "ShowIf": "OR(USERROLE(\"Administrador\"), USERROLE(\"Encargado\"))",
+    "InitialValues": {
+      "Capac_ID": "[_THISROW].[Capac_ID]",
+      "Usuario_ID": "",
+      "Sucursal_ID": "[_THISROW].[Sucursal_ID]",
+      "Estado": "\"Pendiente\"",
+      "Fecha_Asignacion": "TODAY()",
+      "Fecha_Vencimiento": "TODAY() + [_THISROW].[Frecuencia_Renovacion_Meses] * 30",
+      "Es_Recurrente?": "TRUE",
+      "Sync_Pending?": "TRUE"
+    },
+    "InputParameters": [
+      {
+        "Name": "Usuarios_Asignar",
+        "Type": "List",
+        "Required": true,
+        "Prompt": "Emails de usuarios a asignar (separados por coma)",
+        "ItemType": "Text"
+      }
+    ],
+    "ReferencedAction": "Action_Asignar_Capacitacion_Multiples"
+  },
+  {
+    "ActionName": "Action_Asignar_Capacitacion_Multiples",
+    "Type": "Data: add a new row to a table",
+    "Description": "Crea asignación para cada usuario de la lista",
+    "TableName": "Capacitaciones_Usuarios",
+    "RowSelection": {
+      "Type": "Expression",
+      "Expression": "SPLIT([Usuarios_Asignar], \",\")"
+    },
+    "InitialValues": {
+      "Capac_ID": "[_THISROW].[Capac_ID]",
+      "Usuario_ID": "[_THISROW]",
+      "Sucursal_ID": "LOOKUP([_THISROW], \"Usuarios_Sucursales\", \"Email\", \"Sucursal_ID\")",
+      "Estado": "\"Pendiente\"",
+      "Fecha_Asignacion": "TODAY()",
+      "Fecha_Vencimiento": "TODAY() + LOOKUP([_THISROW].[Capac_ID], \"Capacitaciones\", \"Capac_ID\", \"Frecuencia_Renovacion_Meses\") * 30",
+      "Es_Recurrente?": "TRUE",
+      "Sync_Pending?": "TRUE"
+    }
+  },
+  {
+    "ActionName": "Capacitacion_Registrar_Avance",
+    "Type": "Data: set column values",
+    "Description": "Usuario marca capacitación en progreso/completada",
+    "TableName": "Capacitaciones_Usuarios",
+    "ShowIf": "AND(IN([Estado], LIST(\"Pendiente\", \"En_Progreso\")), [Usuario_ID] = USEREMAIL())",
+    "Columns": [
+      "Estado",
+      "Fecha_Completado",
+      "Puntuacion_Examen",
+      "Observaciones",
+      "Fecha_Proxima_Renovacion",
+      "Sync_Pending?"
+    ],
+    "Values": [
+      "IF([Puntuacion_Examen] >= 70, \"Completada\", \"En_Progreso\")",
+      "IF([Puntuacion_Examen] >= 70, TODAY(), \"\")",
+      "",
+      "",
+      "IF([Puntuacion_Examen] >= 70, TODAY() + [Capac_ID].[Frecuencia_Renovacion_Meses] * 30, \"\")",
+      "TRUE"
+    ],
+    "InputParameters": [
+      {
+        "Name": "Nuevo_Estado",
+        "Type": "Enum",
+        "Required": true,
+        "Prompt": "Nuevo estado",
+        "Values": ["En_Progreso", "Completada"]
+      },
+      {
+        "Name": "Puntuacion",
+        "Type": "Number",
+        "Required": false,
+        "Prompt": "Puntuación examen (0-100, opcional)"
+      },
+      {
+        "Name": "Observaciones_Usuario",
+        "Type": "LongText",
+        "Required": false,
+        "Prompt": "Observaciones"
+      }
+    ],
+    "SetValuesWithInputs": [
+      {
+        "Column": "Estado",
+        "Value": "[Nuevo_Estado]"
+      },
+      {
+        "Column": "Puntuacion_Examen",
+        "Value": "[Puntuacion]"
+      },
+      {
+        "Column": "Observaciones",
+        "Value": "[Observaciones_Usuario]"
+      },
+      {
+        "Column": "Fecha_Completado",
+        "Value": "IF([Nuevo_Estado] = \"Completada\", TODAY(), \"\")"
+      },
+      {
+        "Column": "Fecha_Proxima_Renovacion",
+        "Value": "IF([Nuevo_Estado] = \"Completada\", TODAY() + [Capac_ID].[Frecuencia_Renovacion_Meses] * 30, \"\")"
+      }
+    ]
+  },
+  {
+    "ActionName": "KPI_Calcular_Manual",
+    "Type": "Data: execute an action on a set of rows",
+    "Description": "Admin/Encargado fuerza cálculo de KPI ahora",
+    "TableName": "KPI_Definiciones",
+    "ShowIf": "OR(USERROLE(\"Administrador\"), USERROLE(\"Encargado\"))",
+    "ReferencedAction": "Action_Calcular_KPI_Single",
+    "RunAsJob": true
+  },
+  {
+    "ActionName": "Action_Calcular_KPI_Single",
+    "Type": "Data: add a new row to a table",
+    "Description": "Evalúa fórmula AppSheet y guarda registro en Registros_KPI",
+    "TableName": "Registros_KPI",
+    "InitialValues": {
+      "KPI_ID": "[_THISROW].[KPI_ID]",
+      "Sucursal_ID": "[_THISROW].[Sucursal_ID]",
+      "Periodo_Inicio": "TODAY() - 30",
+      "Periodo_Fin": "TODAY()",
+      "Valor": "[_THISROW].[Formula_AppSheet]",
+      "Estado_KPI": "SWITCH(TRUE(), [_THISROW].[Sentido_Bueno] = \"Mayor\", IF([_THISROW].[Formula_AppSheet] >= [_THISROW].[Umbral_Verde], \"Verde\", IF([_THISROW].[Formula_AppSheet] >= [_THISROW].[Umbral_Amarillo], \"Amarillo\", \"Rojo\")), IF([_THISROW].[Formula_AppSheet] <= [_THISROW].[Umbral_Verde], \"Verde\", IF([_THISROW].[Formula_AppSheet] <= [_THISROW].[Umbral_Amarillo], \"Amarillo\", \"Rojo\")))",
+      "Tendencia": "IF(COUNT(FILTER(\"Registros_KPI\", AND([KPI_ID] = [_THISROW].[KPI_ID], [Sucursal_ID] = [_THISROW].[Sucursal_ID], [Fecha_Calculo] >= TODAY() - 60))) > 1, IF([_THISROW].[Formula_AppSheet] > MAX(FILTER(\"Registros_KPI\", AND([KPI_ID] = [_THISROW].[KPI_ID], [Sucursal_ID] = [_THISROW].[Sucursal_ID], [Fecha_Calculo] < TODAY()))[Valor]), \"Mejorando\", IF([_THISROW].[Formula_AppSheet] < MIN(FILTER(\"Registros_KPI\", AND([KPI_ID] = [_THISROW].[KPI_ID], [Sucursal_ID] = [_THISROW].[Sucursal_ID], [Fecha_Calculo] < TODAY()))[Valor]), \"Empeorando\", \"Estable\")), \"Estable\")",
+      "Fecha_Calculo": "NOW()",
+      "Calculado_Por": "USEREMAIL()",
+      "Sync_Pending?": "TRUE"
+    }
+  }
+]

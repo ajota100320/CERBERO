@@ -1,0 +1,107 @@
+{
+  "phase": 1,
+  "name": "Fundaciones",
+  "description": "Multisucursal, Roles, Auditoría, Offline Sync, Config Global, Seguridad base",
+  "dependencies": [],
+  "estimated_time_minutes": 60,
+  "manifest": {
+    "tables_new": [
+      {
+        "source_file": "Fundaciones/01_CSVs_Google_Sheets/01_Usuarios.csv",
+        "table_name": "Usuarios",
+        "key_column": "Usuario_ID",
+        "is_part_of": false,
+        "security_filter": "OR(USERROLE(\"Administrador\"), [Email] = USEREMAIL())"
+      },
+      {
+        "source_file": "Fundaciones/01_CSVs_Google_Sheets/02_Sucursales.csv",
+        "table_name": "Sucursales",
+        "key_column": "Sucursal_ID",
+        "is_part_of": false,
+        "security_filter": "USERROLE(\"Administrador\")"
+      },
+      {
+        "source_file": "Fundaciones/01_CSVs_Google_Sheets/03_Usuarios_Sucursales.csv",
+        "table_name": "Usuarios_Sucursales",
+        "key_column": "Usuario_Sucursal_ID",
+        "is_part_of": false,
+        "security_filter": "OR(USERROLE(\"Administrador\"), [Email] = USEREMAIL())"
+      },
+      {
+        "source_file": "Fundaciones/01_CSVs_Google_Sheets/04_Categorias.csv",
+        "table_name": "Categorias",
+        "key_column": "Categoria_ID",
+        "is_part_of": false,
+        "security_filter": "USERROLE(\"Administrador\")"
+      },
+      {
+        "source_file": "Fundaciones/01_CSVs_Google_Sheets/05_Unidades.csv",
+        "table_name": "Unidades",
+        "key_column": "Unidad_ID",
+        "is_part_of": false,
+        "security_filter": "USERROLE(\"Administrador\")"
+      },
+      {
+        "source_file": "Fundaciones/01_CSVs_Google_Sheets/06_Config_Global.csv",
+        "table_name": "Config_Global",
+        "key_column": "Config_ID",
+        "is_part_of": false,
+        "security_filter": "USERROLE(\"Administrador\")"
+      }
+    ],
+    "tables_extend": [
+      {
+        "table_name": "Ingredientes_y_Stock",
+        "audit_columns_file": "Fundaciones/03_Columnas_Auditoria_Por_Tabla/Columnas_Ingredientes_y_Stock.csv",
+        "security_filter": "OR(USERROLE(\"Administrador\"), IN([Sucursal_ID], SELECT(Usuarios_Sucursales[Sucursal_ID], [Email] = USEREMAIL())))"
+      },
+      {
+        "table_name": "Registro_de_Mermas_y_Vencimientos",
+        "audit_columns_file": "Fundaciones/03_Columnas_Auditoria_Por_Tabla/Columnas_Mermas_y_Vencimientos.csv",
+        "security_filter": "OR(USERROLE(\"Administrador\"), IN([Sucursal_ID], SELECT(Usuarios_Sucursales[Sucursal_ID], [Email] = USEREMAIL())))"
+      },
+      {
+        "table_name": "Registro_de_Compras",
+        "audit_columns_file": "Fundaciones/03_Columnas_Auditoria_Por_Tabla/Columnas_Compras.csv",
+        "security_filter": "OR(USERROLE(\"Administrador\"), IN([Sucursal_ID], SELECT(Usuarios_Sucursales[Sucursal_ID], [Email] = USEREMAIL())))"
+      },
+      {
+        "table_name": "Detalle_de_Compras",
+        "audit_columns_file": "Fundaciones/03_Columnas_Auditoria_Por_Tabla/Columnas_Detalle_Compras.csv",
+        "security_filter": "OR(USERROLE(\"Administrador\"), IN([Registro_de_Compras].[Sucursal_ID], SELECT(Usuarios_Sucursales[Sucursal_ID], [Email] = USEREMAIL())))"
+      },
+      {
+        "table_name": "Ventas_Diarias",
+        "audit_columns_file": "Fundaciones/03_Columnas_Auditoria_Por_Tabla/Columnas_Ventas_Diarias.csv",
+        "security_filter": "OR(USERROLE(\"Administrador\"), IN([Sucursal_ID], SELECT(Usuarios_Sucursales[Sucursal_ID], [Email] = USEREMAIL())))"
+      },
+      {
+        "table_name": "Ajustes_Inventario",
+        "audit_columns_file": "Fundaciones/03_Columnas_Auditoria_Por_Tabla/Columnas_Ajustes_Inventario.csv",
+        "security_filter": "OR(USERROLE(\"Administrador\"), IN([Sucursal_ID], SELECT(Usuarios_Sucursales[Sucursal_ID], [Email] = USEREMAIL())))"
+      }
+    ],
+    "user_roles": {
+      "Administrador": ["admin@tudominio.com"],
+      "Encargado": ["encargado1@tudominio.com", "encargado2@tudominio.com"],
+      "Operador": ["operador1a@tudominio.com", "operador1b@tudominio.com", "operador2a@tudominio.com"]
+    },
+    "offline_sync": {
+      "enabled": true,
+      "tables": ["Ingredientes_y_Stock", "Registro_de_Mermas_y_Vencimientos", "Registro_de_Compras", "Detalle_de_Compras", "Ventas_Diarias", "Ajustes_Inventario"],
+      "sync_interval_minutes": 15
+    },
+    "deployment_steps": [
+      "create_sheets_tabs_from_csvs",
+      "link_tables_in_appsheet",
+      "apply_audit_columns",
+      "apply_security_filters",
+      "configure_user_roles",
+      "enable_offline_sync",
+      "regenerate_structure",
+      "deploy_staging",
+      "run_validation_tests"
+    ],
+    "validation_tests": 15
+  }
+}

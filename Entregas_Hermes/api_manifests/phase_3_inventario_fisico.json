@@ -1,0 +1,84 @@
+{
+  "phase": 3,
+  "name": "Inventario Físico",
+  "description": "Plantillas de conteo, ejecuciones, items, ajustes automáticos, tolerancias por categoría, integración Mermas 2.0",
+  "dependencies": [1, 2],
+  "estimated_time_minutes": 120,
+  "manifest": {
+    "tables_new": [
+      {
+        "source_file": "Fase3_Inventario_Fisico/01_Tablas_Nuevas/Plantillas_Inventario.csv",
+        "table_name": "Plantillas_Inventario",
+        "key_column": "Plantilla_ID",
+        "is_part_of": false,
+        "security_filter": "OR(USERROLE(\"Administrador\"), AND([Activa?] = TRUE, IN([Sucursal_ID], SELECT(Usuarios_Sucursales[Sucursal_ID], [Email] = USEREMAIL()))))"
+      },
+      {
+        "source_file": "Fase3_Inventario_Fisico/01_Tablas_Nuevas/Conteos_Inventario.csv",
+        "table_name": "Conteos_Inventario",
+        "key_column": "Conteo_ID",
+        "is_part_of": false,
+        "security_filter": "OR(USERROLE(\"Administrador\"), IN([Sucursal_ID], SELECT(Usuarios_Sucursales[Sucursal_ID], [Email] = USEREMAIL())))"
+      },
+      {
+        "source_file": "Fase3_Inventario_Fisico/01_Tablas_Nuevas/Items_Conteo.csv",
+        "table_name": "Items_Conteo",
+        "key_column": "Item_ID",
+        "is_part_of": true,
+        "parent_table": "Conteos_Inventario",
+        "parent_ref": "Conteo_ID",
+        "security_filter": "OR(USERROLE(\"Administrador\"), IN([Conteo_ID].[Sucursal_ID], SELECT(Usuarios_Sucursales[Sucursal_ID], [Email] = USEREMAIL())))"
+      },
+      {
+        "source_file": "Fase3_Inventario_Fisico/01_Tablas_Nuevas/Ajustes_Inventario.csv",
+        "table_name": "Ajustes_Inventario",
+        "key_column": "Ajuste_ID",
+        "is_part_of": false,
+        "security_filter": "OR(USERROLE(\"Administrador\"), IN([Sucursal_ID], SELECT(Usuarios_Sucursales[Sucursal_ID], [Email] = USEREMAIL())))"
+      }
+    ],
+    "tables_extend": [
+      {
+        "table_name": "Ingredientes_y_Stock",
+        "audit_columns_file": "Fase3_Inventario_Fisico/03_Columnas_Auditoria_Por_Tabla/Columnas_Inventario_Fisico.csv",
+        "new_columns": [
+          {"name": "Stock_Critico", "type": "Number", "initial": "0"},
+          {"name": "Tolerancia_Conteo_Porcentaje", "type": "Decimal", "initial": "2"},
+          {"name": "Es_Ingrediente_Critico", "type": "Yes/No", "initial": "FALSE"}
+        ]
+      }
+    ],
+    "actions": [
+      {"file": "Fase3_Inventario_Fisico/04_Actions_Inventario.json", "count": 12}
+    ],
+    "bots": [
+      {"file": "Fase3_Inventario_Fisico/05_Bots_Inventario.json", "count": 4}
+    ],
+    "tasks": [
+      {"file": "Fase3_Inventario_Fisico/06_Tasks_Bots_Inventario.json", "count": 6}
+    ],
+    "views": [
+      {"file": "Fase3_Inventario_Fisico/07_Views_Inventario.json", "count": 8}
+    ],
+    "config_global_updates": [
+      {"Config_ID": "CFG_010", "Clave": "UMBRAL_DIFERENCIA_INVENTARIO_PORCENTAJE", "Valor": "5", "Tipo": "Number"},
+      {"Config_ID": "CFG_011", "Clave": "UMBRAL_DIFERENCIA_INVENTARIO_CRITICA", "Valor": "15", "Tipo": "Number"},
+      {"Config_ID": "CFG_012", "Clave": "TOLERANCIA_CONTEO_POR_DEFECTO", "Valor": "2", "Tipo": "Number"}
+    ],
+    "deployment_steps": [
+      "create_4_new_tables_in_sheets",
+      "link_tables_in_appsheet_with_is_part_of",
+      "apply_audit_columns_to_all",
+      "apply_security_filters",
+      "create_actions",
+      "import_bots",
+      "import_tasks",
+      "import_views",
+      "update_config_global",
+      "regenerate_structure",
+      "deploy_staging",
+      "run_validation_tests"
+    ],
+    "validation_tests": 20
+  }
+}

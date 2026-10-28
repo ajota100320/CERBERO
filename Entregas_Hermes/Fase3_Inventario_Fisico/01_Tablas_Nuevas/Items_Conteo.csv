@@ -1,0 +1,5 @@
+Item_ID,Conteo_ID,Ingrediente_ID,Stock_Teoico,Stock_Contado,Unidad_Medida,Diferencia,Porcentaje_Diferencia,Esta_Fuera_Tolerancia?,Tolerancia_Aplicada,Observacion_Contador,Fecha_Conteo,Contado_Por,Sync_Pending?
+ITM_001,CNT_001,[Ingrediente_ID_1],100,98,"Kg",-2,-2.0%,FALSE,5%,"",NOW(),"operador1a@test.com",TRUE
+ITM_002,CNT_001,[Ingrediente_ID_2],50,45,"Kg",-5,-10.0%,TRUE,5%,"Posible merma no registrada",NOW(),"operador1a@test.com",TRUE
+ITM_003,CNT_001,[Ingrediente_ID_3],200,202,"Kg",2,1.0%,FALSE,5%,"",NOW(),"operador1a@test.com",TRUE
+ITM_004,CNT_002,[Ingrediente_ID_4],75,73,"Kg",-2,-2.67%,FALSE,5%,"",NOW(),"operador2a@test.com",TRUE

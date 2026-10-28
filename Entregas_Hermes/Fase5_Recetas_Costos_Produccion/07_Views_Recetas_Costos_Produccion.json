@@ -1,0 +1,504 @@
+[
+  {
+    "ViewName": "View_Recetas_Admin_Todas",
+    "TableName": "Recetas",
+    "Type": "Table",
+    "Position": 1,
+    "ShowIf": "USERROLE(\"Administrador\")",
+    "Columns": [
+      "Nombre",
+      "Categoria",
+      "Sucursal_ID",
+      "Estado",
+      "Version",
+      "Rendimiento_Porciones",
+      "Costo_Total_Receta",
+      "Costo_Por_Porciona",
+      "Es_Activa?",
+      "Fecha_Creacion"
+    ],
+    "OrderBy": "Sucursal_ID, Categoria, Nombre",
+    "GroupBy": "Estado",
+    "Options": {
+      "ShowSearch": true,
+      "ShowSelect": false,
+      "AllowInlineEdit": true
+    },
+    "Actions": [
+      "Receta_Aprobar",
+      "Receta_Rechazar",
+      "Receta_Duplicar",
+      "Receta_Ver_Costo_Detalle"
+    ]
+  },
+  {
+    "ViewName": "View_Recetas_Encargado_Mi_Sucursal",
+    "TableName": "Recetas",
+    "Type": "Deck",
+    "Position": 2,
+    "ShowIf": "OR(USERROLE(\"Encargado\"), USERROLE(\"Operador\"))",
+    "Columns": [
+      "Nombre",
+      "Categoria",
+      "Estado",
+      "Rendimiento_Porciones",
+      "Unidad_Rendimiento",
+      "Costo_Por_Porciona",
+      "Version"
+    ],
+    "RowFilter": "AND([Es_Activa?] = TRUE, IN([Sucursal_ID], SELECT(Usuarios_Sucursales[Sucursal_ID], [Email] = USEREMAIL())))",
+    "OrderBy": "Categoria, Nombre",
+    "GroupBy": "Estado",
+    "Options": {
+      "ShowSearch": true,
+      "ShowSelect": false,
+      "AllowInlineEdit": false
+    },
+    "Actions": [
+      "Receta_Crear_Nueva",
+      "Receta_Enviar_Revision",
+      "Receta_Ver_Ingredientes"
+    ]
+  },
+  {
+    "ViewName": "View_Receta_Formulario_Nueva",
+    "TableName": "Recetas",
+    "Type": "Form",
+    "Position": 3,
+    "ShowIf": "USERROLE(\"Encargado\")",
+    "Columns": [
+      "Nombre",
+      "Categoria",
+      "Descripcion",
+      "Rendimiento_Porciones",
+      "Unidad_Rendimiento",
+      "Tiempo_Preparacion_Min",
+      "Tiempo_Coccion_Min",
+      "Dificultad"
+    ],
+    "InitialValues": {
+      "Estado": "\"Borrador\"",
+      "Version": "1",
+      "Es_Activa?": "TRUE",
+      "Sucursal_ID": "LOOKUP(USEREMAIL(), \"Usuarios_Sucursales\", \"Email\", \"Sucursal_ID\")",
+      "Creado_Por": "USEREMAIL()",
+      "Fecha_Creacion": "NOW()",
+      "Sync_Pending?": "TRUE"
+    },
+    "Options": {
+      "ShowCancelButton": true,
+      "ShowSaveButton": true
+    }
+  },
+  {
+    "ViewName": "View_Receta_Formulario_Edicion",
+    "TableName": "Recetas",
+    "Type": "Form",
+    "Position": 4,
+    "ShowIf": "OR(USERROLE(\"Administrador\"), AND(USERROLE(\"Encargado\"), [Estado] = \"Borrador\", [Creado_Por] = USEREMAIL()))",
+    "Columns": [
+      "Nombre",
+      "Categoria",
+      "Descripcion",
+      "Rendimiento_Porciones",
+      "Unidad_Rendimiento",
+      "Tiempo_Preparacion_Min",
+      "Tiempo_Coccion_Min",
+      "Dificultad",
+      "Es_Activa?",
+      "Version"
+    ],
+    "Options": {
+      "ShowCancelButton": true,
+      "ShowSaveButton": true
+    }
+  },
+  {
+    "ViewName": "View_Receta_Ingredientes_Encargado",
+    "TableName": "Receta_Ingredientes",
+    "Type": "Table",
+    "Position": 5,
+    "ShowIf": "OR(USERROLE(\"Administrador\"), USERROLE(\"Encargado\"))",
+    "Columns": [
+      "Ingrediente_ID",
+      "Cantidad",
+      "Unidad_Medida",
+      "Merma_Porcentaje",
+      "Costo_Unitario_Snapshot",
+      "Costo_Total_Linea",
+      "Es_Opcional",
+      "Orden"
+    ],
+    "RowFilter": "IN([Receta_ID].[Sucursal_ID], SELECT(Usuarios_Sucursales[Sucursal_ID], [Email] = USEREMAIL())) OR USERROLE(\"Administrador\")",
+    "OrderBy": "[Receta_ID].[Nombre], [Orden]",
+    "GroupBy": "Receta_ID",
+    "Options": {
+      "ShowSearch": true,
+      "ShowSelect": false,
+      "AllowInlineEdit": true
+    },
+    "Actions": [
+      "Receta_Agregar_Ingrediente",
+      "Receta_Eliminar_Ingrediente",
+      "Receta_Actualizar_Costo_Linea"
+    ]
+  },
+  {
+    "ViewName": "View_Receta_Ingredientes_Produccion",
+    "TableName": "Receta_Ingredientes",
+    "Type": "Table",
+    "Position": 6,
+    "ShowIf": "USERROLE(\"Operador\")",
+    "Columns": [
+      "Ingrediente_ID",
+      "Cantidad",
+      "Unidad_Medida",
+      "Merma_Porcentaje",
+      "Es_Opcional"
+    ],
+    "RowFilter": "AND([Receta_ID].[Estado] = \"Aprobada\", [Receta_ID].[Es_Activa?] = TRUE, IN([Receta_ID].[Sucursal_ID], SELECT(Usuarios_Sucursales[Sucursal_ID], [Email] = USEREMAIL())))",
+    "OrderBy": "[Receta_ID].[Nombre], [Orden]",
+    "Options": {
+      "ShowSearch": true,
+      "ShowSelect": false,
+      "AllowInlineEdit": false
+    }
+  },
+  {
+    "ViewName": "View_Produccion_Admin_Todas",
+    "TableName": "Produccion",
+    "Type": "Table",
+    "Position": 7,
+    "ShowIf": "USERROLE(\"Administrador\")",
+    "Columns": [
+      "Lote",
+      "Receta_ID",
+      "Sucursal_ID",
+      "Estado",
+      "Producida_Por",
+      "Fecha_Produccion",
+      "Cantidad_Producida",
+      "Unidad_Produccion",
+      "Costo_Teorico_Total",
+      "Costo_Real_Total",
+      "Variacion_Costo"
+    ],
+    "OrderBy": "Fecha_Produccion DESC",
+    "GroupBy": "Estado",
+    "Options": {
+      "ShowSearch": true,
+      "ShowSelect": false,
+      "AllowInlineEdit": false
+    },
+    "Actions": [
+      "Produccion_Ver_Detalle",
+      "Produccion_Completar",
+      "Produccion_Cancelar"
+    ]
+  },
+  {
+    "ViewName": "View_Produccion_Encargado_Mi_Sucursal",
+    "TableName": "Produccion",
+    "Type": "Deck",
+    "Position": 8,
+    "ShowIf": "OR(USERROLE(\"Encargado\"), USERROLE(\"Operador\"))",
+    "Columns": [
+      "Lote",
+      "Receta_ID",
+      "Estado",
+      "Fecha_Produccion",
+      "Cantidad_Producida",
+      "Costo_Teorico_Total",
+      "Costo_Real_Total"
+    ],
+    "RowFilter": "IN([Sucursal_ID], SELECT(Usuarios_Sucursales[Sucursal_ID], [Email] = USEREMAIL()))",
+    "OrderBy": "Fecha_Produccion DESC",
+    "GroupBy": "Estado",
+    "Options": {
+      "ShowSearch": true,
+      "ShowSelect": false,
+      "AllowInlineEdit": false
+    },
+    "Actions": [
+      "Produccion_Iniciar_Nueva",
+      "Produccion_Completar",
+      "Produccion_Ver_Detalle"
+    ]
+  },
+  {
+    "ViewName": "View_Produccion_Formulario_Nueva",
+    "TableName": "Produccion",
+    "Type": "Form",
+    "Position": 9,
+    "ShowIf": "OR(USERROLE(\"Encargado\"), USERROLE(\"Operador\"))",
+    "Columns": [
+      "Receta_ID",
+      "Cantidad_Producida",
+      "Unidad_Produccion",
+      "Observaciones"
+    ],
+    "RowFilter": "AND([Receta_ID].[Estado] = \"Aprobada\", [Receta_ID].[Es_Activa?] = TRUE, IN([Receta_ID].[Sucursal_ID], SELECT(Usuarios_Sucursales[Sucursal_ID], [Email] = USEREMAIL())))",
+    "InitialValues": {
+      "Estado": "\"En_Proceso\"",
+      "Producida_Por": "USEREMAIL()",
+      "Fecha_Produccion": "NOW()",
+      "Lote": "CONCATENATE(\"LOTE-\", YEAR(NOW()), MONTH(NOW()), DAY(NOW()), \"-\", RANDBETWEEN(100,999))",
+      "Sucursal_ID": "LOOKUP([Receta_ID], \"Recetas\", \"Receta_ID\", \"Sucursal_ID\")",
+      "Costo_Teorico_Total": "[Cantidad_Producida] * LOOKUP([Receta_ID], \"Recetas\", \"Receta_ID\", \"Costo_Por_Porciona\")",
+      "Sync_Pending?": "TRUE"
+    },
+    "Options": {
+      "ShowCancelButton": true,
+      "ShowSaveButton": true
+    }
+  },
+  {
+    "ViewName": "View_Produccion_Detalle_Operador",
+    "TableName": "Produccion_Detalle",
+    "Type": "Table",
+    "Position": 10,
+    "ShowIf": "OR(USERROLE(\"Encargado\"), USERROLE(\"Operador\"))",
+    "Columns": [
+      "Ingrediente_ID",
+      "Cantidad_Teorica",
+      "Cantidad_Real",
+      "Unidad_Medida",
+      "Diferencia",
+      "Merma_Real_Porcentaje",
+      "Costo_Teorico_Linea",
+      "Costo_Real_Linea",
+      "Observacion"
+    ],
+    "RowFilter": "IN([Produccion_ID].[Sucursal_ID], SELECT(Usuarios_Sucursales[Sucursal_ID], [Email] = USEREMAIL()))",
+    "OrderBy": "[Produccion_ID].[Fecha_Produccion] DESC, [Orden]",
+    "GroupBy": "Produccion_ID",
+    "Options": {
+      "ShowSearch": true,
+      "ShowSelect": false,
+      "AllowInlineEdit": true
+    },
+    "Actions": [
+      "Produccion_Detalle_Registrar_Consumo"
+    ]
+  },
+  {
+    "ViewName": "View_Produccion_Detalle_Admin",
+    "TableName": "Produccion_Detalle",
+    "Type": "Table",
+    "Position": 11,
+    "ShowIf": "USERROLE(\"Administrador\")",
+    "Columns": [
+      "Produccion_ID",
+      "Ingrediente_ID",
+      "Cantidad_Teorica",
+      "Cantidad_Real",
+      "Unidad_Medida",
+      "Diferencia",
+      "Merma_Real_Porcentaje",
+      "Costo_Teorico_Linea",
+      "Costo_Real_Linea",
+      "Observacion"
+    ],
+    "OrderBy": "[Produccion_ID].[Fecha_Produccion] DESC",
+    "GroupBy": "Produccion_ID",
+    "Options": {
+      "ShowSearch": true,
+      "ShowSelect": false,
+      "AllowInlineEdit": true
+    }
+  },
+  {
+    "ViewName": "View_Costos_Historicos_Admin",
+    "TableName": "Costos_Historicos",
+    "Type": "Table",
+    "Position": 12,
+    "ShowIf": "USERROLE(\"Administrador\")",
+    "Columns": [
+      "Entidad_Tipo",
+      "Entidad_ID",
+      "Sucursal_ID",
+      "Costo_Anterior",
+      "Costo_Nuevo",
+      "Variacion_Porcentaje",
+      "Fuente_Cambio",
+      "Cambiado_Por",
+      "Fecha_Cambio",
+      "Activo?"
+    ],
+    "OrderBy": "Fecha_Cambio DESC",
+    "GroupBy": "Entidad_Tipo",
+    "Options": {
+      "ShowSearch": true,
+      "ShowSelect": false,
+      "AllowInlineEdit": false
+    }
+  },
+  {
+    "ViewName": "View_Costos_Historicos_Encargado",
+    "TableName": "Costos_Historicos",
+    "Type": "Table",
+    "Position": 13,
+    "ShowIf": "USERROLE(\"Encargado\")",
+    "Columns": [
+      "Entidad_Tipo",
+      "Entidad_ID",
+      "Costo_Anterior",
+      "Costo_Nuevo",
+      "Variacion_Porcentaje",
+      "Fuente_Cambio",
+      "Fecha_Cambio"
+    ],
+    "RowFilter": "IN([Sucursal_ID], SELECT(Usuarios_Sucursales[Sucursal_ID], [Email] = USEREMAIL()))",
+    "OrderBy": "Fecha_Cambio DESC",
+    "Options": {
+      "ShowSearch": true,
+      "ShowSelect": false,
+      "AllowInlineEdit": false
+    }
+  },
+  {
+    "ViewName": "View_Dashboard_Costos_Produccion_Admin",
+    "TableName": "Produccion",
+    "Type": "Dashboard",
+    "Position": 14,
+    "ShowIf": "USERROLE(\"Administrador\")",
+    "Columns": [
+      "Receta_ID",
+      "Sucursal_ID",
+      "Estado",
+      "Fecha_Produccion",
+      "Costo_Teorico_Total",
+      "Costo_Real_Total",
+      "Variacion_Costo"
+    ],
+    "Options": {
+      "Charts": [
+        {
+          "Name": "Producciones por Estado",
+          "Type": "Pie",
+          "Dimension": "Estado",
+          "Measure": "COUNT(*)"
+        },
+        {
+          "Name": "Costo Teórico vs Real por Receta (Mes)",
+          "Type": "Bar",
+          "Dimension": "[Receta_ID].[Nombre]",
+          "Measure": "SUM([Costo_Real_Total])",
+          "Filter": "AND(MONTH([Fecha_Produccion]) = MONTH(TODAY()), [Estado] = \"Completada\")",
+          "Series": [
+            {
+              "Name": "Teórico",
+              "Expression": "SUM([Costo_Teorico_Total])"
+            },
+            {
+              "Name": "Real",
+              "Expression": "SUM([Costo_Real_Total])"
+            }
+          ]
+        },
+        {
+          "Name": "Variación % Costo por Sucursal (Mes)",
+          "Type": "Bar",
+          "Dimension": "[Sucursal_ID].[Nombre]",
+          "Measure": "AVERAGE([Variacion_Costo] / [Costo_Teorico_Total] * 100)",
+          "Filter": "AND(MONTH([Fecha_Produccion]) = MONTH(TODAY()), [Estado] = \"Completada\")"
+        },
+        {
+          "Name": "Top 5 Ingredientes con Mayor Variación (Mes)",
+          "Type": "Table",
+          "Dimension": "[Produccion_Detalle].[Ingrediente_ID].[Nombre]",
+          "Measure": "AVERAGE([Merma_Real_Porcentaje])",
+          "Filter": "AND(MONTH([Produccion_ID].[Fecha_Produccion]) = MONTH(TODAY()), [Produccion_ID].[Estado] = \"Completada\")",
+          "Options": {
+            "SortBy": "Measure",
+            "SortOrder": "Descending",
+            "Limit": 5
+          }
+        }
+      ],
+      "KPIs": [
+        {
+          "Name": "Producciones En Proceso Hoy",
+          "Expression": "COUNT(FILTER(\"Produccion\", AND([Estado] = \"En_Proceso\", DAY([Fecha_Produccion]) = DAY(TODAY()))))",
+          "Icon": "factory",
+          "Color": "Info"
+        },
+        {
+          "Name": "Variación Promedio Costo (Mes)",
+          "Expression": "AVERAGE(FILTER(\"Produccion\", AND([Estado] = \"Completada\", MONTH([Fecha_Produccion]) = MONTH(TODAY()))), [Variacion_Costo] / [Costo_Teorico_Total] * 100)",
+          "Icon": "trending-up",
+          "Color": "Warning"
+        },
+        {
+          "Name": "Recetas Aprobadas Activas",
+          "Expression": "COUNT(FILTER(\"Recetas\", AND([Estado] = \"Aprobada\", [Es_Activa?] = TRUE)))",
+          "Icon": "clipboard-check",
+          "Color": "Success"
+        },
+        {
+          "Name": "Alertas Costo Crítico Pendientes",
+          "Expression": "COUNT(FILTER(\"Costos_Historicos\", AND([Fecha_Cambio] >= TODAY() - 7, ABS([Variacion_Porcentaje]) > LOOKUP(\"UMBRAL_VARIACION_COSTO_CRITICA\", \"Config_Global\", \"Clave\", \"Valor\"), [Activo?] = TRUE)))",
+          "Icon": "alert-triangle",
+          "Color": "Danger"
+        }
+      ]
+    }
+  },
+  {
+    "ViewName": "View_Dashboard_Produccion_Encargado",
+    "TableName": "Produccion",
+    "Type": "Dashboard",
+    "Position": 15,
+    "ShowIf": "USERROLE(\"Encargado\")",
+    "Columns": [
+      "Receta_ID",
+      "Estado",
+      "Fecha_Produccion",
+      "Costo_Teorico_Total",
+      "Costo_Real_Total"
+    ],
+    "RowFilter": "IN([Sucursal_ID], SELECT(Usuarios_Sucursales[Sucursal_ID], [Email] = USEREMAIL()))",
+    "Options": {
+      "Charts": [
+        {
+          "Name": "Producciones esta semana",
+          "Type": "Bar",
+          "Dimension": "WEEKDAY([Fecha_Produccion])",
+          "Measure": "COUNT(*)",
+          "Filter": "AND([Fecha_Produccion] >= TODAY() - 7, [Estado] = \"Completada\")"
+        },
+        {
+          "Name": "Costo Teórico vs Real por Receta",
+          "Type": "Bar",
+          "Dimension": "[Receta_ID].[Nombre]",
+          "Measure": "SUM([Costo_Real_Total])",
+          "Filter": "AND(MONTH([Fecha_Produccion]) = MONTH(TODAY()), [Estado] = \"Completada\")",
+          "Series": [
+            {
+              "Name": "Teórico",
+              "Expression": "SUM([Costo_Teorico_Total])"
+            },
+            {
+              "Name": "Real",
+              "Expression": "SUM([Costo_Real_Total])"
+            }
+          ]
+        }
+      ],
+      "KPIs": [
+        {
+          "Name": "Produciendo ahora",
+          "Expression": "COUNT(FILTER(\"Produccion\", AND([Estado] = \"En_Proceso\", IN([Sucursal_ID], SELECT(Usuarios_Sucursales[Sucursal_ID], [Email] = USEREMAIL())))))",
+          "Icon": "factory",
+          "Color": "Info"
+        },
+        {
+          "Name": "Completadas esta semana",
+          "Expression": "COUNT(FILTER(\"Produccion\", AND([Estado] = \"Completada\", [Fecha_Produccion] >= TODAY() - 7, IN([Sucursal_ID], SELECT(Usuarios_Sucursales[Sucursal_ID], [Email] = USEREMAIL())))))",
+          "Icon": "check-circle",
+          "Color": "Success"
+        }
+      ]
+    }
+  }
+]

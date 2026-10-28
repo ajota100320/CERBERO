@@ -1,0 +1,4 @@
+Prod_Det_ID,Produccion_ID,Receta_Ing_ID,Ingrediente_ID,Cantidad_Teorica,Cantidad_Real,Unidad_Medida,Diferencia,Merma_Real_Porcentaje,Costo_Teorico_Linea,Costo_Real_Linea,Observacion,Fecha_Creacion,Creado_Por,Sync_Pending?
+PD_001,PROD_001,RI_001,[Ingrediente_ID_Carne],1.5,1.55,"Kg",0.05,3.3%,22.50,23.25,"Ligeramente más carne",NOW(),USEREMAIL(),TRUE
+PD_002,PROD_001,RI_002,[Ingrediente_ID_Pan],10,10,"Unidades",0,0%,15.00,15.00,"",NOW(),USEREMAIL(),TRUE
+PD_003,PROD_001,RI_003,[Ingrediente_ID_Queso],0.5,0.48,"Kg",-0.02,-4%,12.50,12.00,"",NOW(),USEREMAIL(),TRUE

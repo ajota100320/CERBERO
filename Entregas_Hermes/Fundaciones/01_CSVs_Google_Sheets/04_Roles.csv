@@ -1,0 +1,4 @@
+Rol_ID,Nombre_Rol,Descripcion,Nivel_Jerarquia,Permite_Admin_Usuarios,Permite_Config_Global,Permite_Aprobar_Mermas,Permite_Aprobar_Costos,Permite_Ver_Todas_Sucursales,Activo?
+ROL_ADMIN,"Administrador","Control total del sistema",100,TRUE,TRUE,TRUE,TRUE,TRUE,TRUE
+ROL_ENCARGADO,"Encargado","Supervisión operativa de una sucursal",50,FALSE,FALSE,TRUE,FALSE,FALSE,TRUE
+ROL_OPERADOR,"Operador","Ejecución de tareas operativas",10,FALSE,FALSE,FALSE,FALSE,FALSE,TRUE

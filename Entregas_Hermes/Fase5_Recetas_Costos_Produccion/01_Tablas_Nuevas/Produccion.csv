@@ -1,0 +1,3 @@
+Produccion_ID,Receta_ID,Sucursal_ID,Producida_Por,Fecha_Produccion,Cantidad_Producida,Unidad_Produccion,Lote,Estado,Observaciones,Costo_Teorico_Total,Costo_Real_Total,Variacion_Costo,Fecha_Creacion,Creado_Por,Sync_Pending?
+PROD_001,REC_001,[Sucursal_ID_Suc1],"operador1a@test.com",NOW(),10,"Porciones","LOTE-001","Completada","Producción normal",150.00,152.00,2.00,NOW(),USEREMAIL(),TRUE
+PROD_002,REC_003,[Sucursal_ID_Suc2],"operador2a@test.com",NOW(),15,"Porciones","LOTE-002","En_Proceso","",232.50,,0,NOW(),USEREMAIL(),TRUE

@@ -1,0 +1,92 @@
+{
+  "phase": 5,
+  "name": "Recetas + Costos + Producción",
+  "description": "Catálogo de recetas (BOM), costeo automático, versionado, producción ejecutada con consumo real vs teórico, histórico de costos, alertas de variación",
+  "dependencies": [1, 2, 3, 4],
+  "estimated_time_minutes": 150,
+  "manifest": {
+    "tables_new": [
+      {
+        "source_file": "Fase5_Recetas_Costos_Produccion/01_Tablas_Nuevas/Recetas.csv",
+        "table_name": "Recetas",
+        "key_column": "Receta_ID",
+        "is_part_of": false,
+        "security_filter": "OR(USERROLE(\"Administrador\"), AND([Es_Activa?] = TRUE, IN([Sucursal_ID], SELECT(Usuarios_Sucursales[Sucursal_ID], [Email] = USEREMAIL()))))"
+      },
+      {
+        "source_file": "Fase5_Recetas_Costos_Produccion/01_Tablas_Nuevas/Receta_Ingredientes.csv",
+        "table_name": "Receta_Ingredientes",
+        "key_column": "Receta_Ing_ID",
+        "is_part_of": true,
+        "parent_table": "Recetas",
+        "parent_ref": "Receta_ID",
+        "security_filter": "OR(USERROLE(\"Administrador\"), IN([Receta_ID].[Sucursal_ID], SELECT(Usuarios_Sucursales[Sucursal_ID], [Email] = USEREMAIL())))"
+      },
+      {
+        "source_file": "Fase5_Recetas_Costos_Produccion/01_Tablas_Nuevas/Produccion.csv",
+        "table_name": "Produccion",
+        "key_column": "Produccion_ID",
+        "is_part_of": false,
+        "security_filter": "OR(USERROLE(\"Administrador\"), IN([Sucursal_ID], SELECT(Usuarios_Sucursales[Sucursal_ID], [Email] = USEREMAIL())))"
+      },
+      {
+        "source_file": "Fase5_Recetas_Costos_Produccion/01_Tablas_Nuevas/Produccion_Detalle.csv",
+        "table_name": "Produccion_Detalle",
+        "key_column": "Prod_Det_ID",
+        "is_part_of": true,
+        "parent_table": "Produccion",
+        "parent_ref": "Produccion_ID",
+        "security_filter": "OR(USERROLE(\"Administrador\"), IN([Produccion_ID].[Sucursal_ID], SELECT(Usuarios_Sucursales[Sucursal_ID], [Email] = USEREMAIL())))"
+      },
+      {
+        "source_file": "Fase5_Recetas_Costos_Produccion/01_Tablas_Nuevas/Costos_Historicos.csv",
+        "table_name": "Costos_Historicos",
+        "key_column": "Costo_ID",
+        "is_part_of": false,
+        "security_filter": "OR(USERROLE(\"Administrador\"), IN([Sucursal_ID], SELECT(Usuarios_Sucursales[Sucursal_ID], [Email] = USEREMAIL())))"
+      }
+    ],
+    "tables_extend": [
+      {
+        "table_name": "Ingredientes_y_Stock",
+        "audit_columns_file": "Fase5_Recetas_Costos_Produccion/03_Columnas_Auditoria_Por_Tabla/Columnas_Recetas_Costos_Produccion.csv",
+        "new_columns": [
+          {"name": "Consumo_Diario_Promedio", "type": "Decimal", "app_formula": "AVERAGE(FILTER(\"Produccion_Detalle\", AND([Ingrediente_ID] = [_THISROW].[Ingrediente_ID], [Produccion_ID].[Fecha_Produccion] >= TODAY() - 30))[Cantidad_Real])"}
+        ]
+      }
+    ],
+    "actions": [
+      {"file": "Fase5_Recetas_Costos_Produccion/04_Actions_Recetas_Costos_Produccion.json", "count": 19}
+    ],
+    "bots": [
+      {"file": "Fase5_Recetas_Costos_Produccion/05_Bots_Recetas_Costos_Produccion.json", "count": 7}
+    ],
+    "tasks": [
+      {"file": "Fase5_Recetas_Costos_Produccion/06_Tasks_Bots_Recetas_Costos_Produccion.json", "count": 14}
+    ],
+    "views": [
+      {"file": "Fase5_Recetas_Costos_Produccion/07_Views_Recetas_Costos_Produccion.json", "count": 15}
+    ],
+    "config_global_updates": [
+      {"Config_ID": "CFG_015", "Clave": "UMBRAL_VARIACION_COSTO_CRITICA", "Valor": "10", "Tipo": "Number"},
+      {"Config_ID": "CFG_016", "Clave": "UMBRAL_MERMA_REAL_ALERTA", "Valor": "15", "Tipo": "Number"},
+      {"Config_ID": "CFG_017", "Clave": "HORAS_ALERTA_PRODUCCION_ESTANCADA", "Valor": "24", "Tipo": "Number"},
+      {"Config_ID": "CFG_018", "Clave": "RECALCULAR_COSTOS_RECETAS_AUTO", "Valor": "TRUE", "Tipo": "Yes/No"}
+    ],
+    "deployment_steps": [
+      "create_5_new_tables_in_sheets",
+      "link_tables_in_appsheet_with_is_part_of",
+      "apply_audit_columns_to_all",
+      "apply_security_filters",
+      "create_actions",
+      "import_bots",
+      "import_tasks",
+      "import_views",
+      "update_config_global",
+      "regenerate_structure",
+      "deploy_staging",
+      "run_validation_tests"
+    ],
+    "validation_tests": 25
+  }
+}

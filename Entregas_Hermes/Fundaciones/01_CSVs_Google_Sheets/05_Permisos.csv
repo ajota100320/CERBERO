@@ -1,0 +1,12 @@
+Permiso_ID,Rol_ID,Tabla_Entidad,Accion,Condicion_Expresion,Descripcion,Activo?
+PERM_001,ROL_ADMIN,*,*,"USERROLE(""Administrador"")","Acceso total administrador",TRUE
+PERM_002,ROL_ENCARGADO,Registro_de_Mermas_y_Vencimientos,"READ,WRITE","AND(USERROLE(""Encargado""), [Sucursal_ID] = LOOKUP(USEREMAIL(), ""Usuarios_Sucursales"", ""Email"", ""Sucursal_ID""))","Encargado gestiona mermas de su sucursal",TRUE
+PERM_003,ROL_ENCARGADO,Conteos_Inventario,"READ,WRITE","AND(USERROLE(""Encargado""), [Sucursal_ID] = LOOKUP(USEREMAIL(), ""Usuarios_Sucursales"", ""Email"", ""Sucursal_ID""))","Encargado gestiona inventarios de su sucursal",TRUE
+PERM_004,ROL_ENCARGADO,Tareas,"READ,WRITE","AND(USERROLE(""Encargado""), [Sucursal_ID] = LOOKUP(USEREMAIL(), ""Usuarios_Sucursales"", ""Email"", ""Sucursal_ID""))","Encargado gestiona tareas de su sucursal",TRUE
+PERM_005,ROL_ENCARGADO,Ordenes_Transferencia,"READ,WRITE","AND(USERROLE(""Encargado""), IN([Sucursal_Origen_ID], SELECT(Usuarios_Sucursales[Sucursal_ID], [Email] = USEREMAIL())) OR IN([Sucursal_Destino_ID], SELECT(Usuarios_Sucursales[Sucursal_ID], [Email] = USEREMAIL())))","Encargado gestiona transferencias de su sucursal",TRUE
+PERM_006,ROL_OPERADOR,Registro_de_Mermas_y_Vencimientos,"READ,WRITE","AND(USERROLE(""Operador""), USEREMAIL() = [Created_By] OR [Estado_Merma] = ""Borrador"")","Operador crea y ve sus mermas",TRUE
+PERM_007,ROL_OPERADOR,Conteos_Inventario,"READ,WRITE","AND(USERROLE(""Operador""), USEREMAIL() = [Responsable_ID])","Operador completa sus conteos asignados",TRUE
+PERM_008,ROL_OPERADOR,Tareas,"READ,WRITE","AND(USERROLE(""Operador""), USEREMAIL() = [Asignado_A])","Operador ve y completa sus tareas",TRUE
+PERM_009,ROL_OPERADOR,Lista_de_Verificacion_Diario,"READ,WRITE","AND(USERROLE(""Operador""), USEREMAIL() = [Created_By])","Operador completa sus checklists",TRUE
+PERM_010,ROL_OPERADOR,Higiene_del_Personal,"READ,WRITE","AND(USERROLE(""Operador""), USEREMAIL() = [Created_By])","Operador registra su higiene",TRUE
+PERM_011,ROL_OPERADOR,Registro_Temperaturas,"READ,WRITE","AND(USERROLE(""Operador""), USEREMAIL() = [Created_By])","Operador registra temperaturas",TRUE
