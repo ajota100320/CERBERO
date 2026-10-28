@@ -575,6 +575,8 @@ app.include_router(produccion.router)
 app.include_router(rrhh.router)
 app.include_router(checklists.router)
 app.include_router(mermas.router)
+from app.routers import dashboard_ui
+app.include_router(dashboard_ui.router)
 
 # ──────────────────────────────────────────────
 # ENTRY POINT
